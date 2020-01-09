@@ -1,4 +1,4 @@
-b #llreplace
+#llreplace
 OSX / Linux / DOS  File find and replace text command line tool.
 
 LLReplace searches file text data using regular expression and replaces matches with substitution text.
