@@ -40,12 +40,12 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
-
+#include <stdlib.h>     // stroul
 
 #include "ll_stdhdr.h"
 #include "directory.h"
 #include "split.h"
-
+#include "filters.h"
 
 #include <vector>
 #include <map>
@@ -69,8 +69,11 @@ StringList fileDirList;
 bool showFile = true;
 bool showMatch = true;
 bool showPattern = false;
+bool inverseMatch = false;
 uint optionErrCnt = 0;
 uint patternErrCnt = 0;
+
+lstring printPosFmt = "%.0s(%lu,%lu)";
 
 // Working values
 bool doReplace = false;
@@ -84,6 +87,13 @@ std::vector<char> buffer;
     std::replace(title.begin(), title.end(), SLASH_CHR, '_');
 
 #endif
+
+
+
+Filter nopFilter;
+LineFilter lineFilter;
+Filter* pFilter = &nopFilter;
+
 
 // ---------------------------------------------------------------------------
 // Dump String, showing non-printable has hex value.
@@ -206,7 +216,7 @@ unsigned FindGrep(const char* filepath)
     ifstream        in;
     ofstream        out;
     struct stat     filestat;
-    uint           matchCnt = 0;
+    uint            matchCnt = 0;
     
 #if 1
     std::regex_constants::match_flag_type flags = std::regex_constants::match_default;
@@ -234,6 +244,7 @@ unsigned FindGrep(const char* filepath)
             const char* begPtr = (const char*)buffer.data();
             const char* endPtr = begPtr + inCnt;
             size_t off = 0;
+            pFilter->init(buffer);
             
             while (std::regex_search(begPtr, endPtr, match, fromPat, flags))
             {
@@ -248,13 +259,17 @@ unsigned FindGrep(const char* filepath)
                 
                 off += pos;
                 
-                if (showMatch)
-                    std::cout << "(" << off << "," << len << ")" << lstring(begPtr+pos, len) << std::endl;
+                if (pFilter->valid(off, len)) {
+                    if (showMatch)
+                        printf(printPosFmt, filepath, off, len, filepath);
+                        // std::cout << "(" << off << "," << len << ")";
+                        std::cout << lstring(begPtr+pos, len) << std::endl;
+                     matchCnt++;
+                }
                 
                 begPtr += pos + len;
-                matchCnt++;
             }
-            return matchCnt;
+            return inverseMatch ? (matchCnt>0?0:1): matchCnt;
         }
         else
         {
@@ -294,8 +309,10 @@ bool ReplaceFile(const lstring& filepath, const lstring& filename)
             std::match_results <const char*> match;
             const char* begPtr = (const char*)buffer.data();
             const char* endPtr = begPtr + inCnt;
+            pFilter->init(buffer);
             
-            if (std::regex_search(begPtr, endPtr, match, fromPat, flags))
+            if (std::regex_search(begPtr, endPtr, match, fromPat, flags)
+                && pFilter->valid(match.position(),match.length()))
             {
                 if (!backupDir.empty())
                 {
@@ -470,17 +487,24 @@ int main(int argc, char* argv[])
             "   -from=<regExpression>          ; Pattern to find\n"
             "   -to=<regExpression or string>  ; Optional replacment \n"
             "   -backupDir=<directory>         ; Optional Path to store backup copy before change\n"
+            "\n"
             "   -includeFiles=<filePattern>    ; Optional files to include in file scan, default=*\n"
             "   -excludeFiles=<filePattern>    ; Optional files to exclude in file scan, no default\n"
+            "\n"
+            "   -range=beg,end                 ; Optional line range filter \n"
+            "   -inverse                       ; Invert Search, show files not matching \n"
+            "\n"
             "   directories...                 ; Directories to scan"
             "\n"
             "Other options:\n"
             "   -show=<file|match|pattern>      ; Show file path, text match or patterns \n"
             "   -hide=<file|match>              ; Hide showing file path or text macth \n"
+            "   -printPos='%d,%d'              ; Printf format to present match,  file, position, length, file \n"
+            "                                  ; Def: %.0s(%d,%d), ex (%-20.20s) or %.0s%d or %s,%d  \n"
             "\n"
             "Examples\n"
             " Search only, show patterns and defaults showing file and match:\n"
-            "  llreplace -show=pattern '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' -hide=match '-include=*.java' src\n"
+            "  llreplace -show=pattern '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' -hide=match '-include=*.java' -range=0,10 -range=20,-1 -printPos='%03d: ' src\n"
             " Search and replace in-place:\n"
             "  llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' '-to=MapConfigInfo.$1$2$3' '-include=*.java' src\n"
             "\n";
@@ -495,7 +519,7 @@ int main(int argc, char* argv[])
             {
                 lstring argStr(argv[argn]);
                 Split cmdValue(argStr, "=", 2);
-                if (cmdValue.size() == 2)
+                if (cmdValue.size() >= 1)
                 {
                     lstring cmd = cmdValue[0];
                     lstring value = cmdValue[1];
@@ -520,7 +544,8 @@ int main(int argc, char* argv[])
                         }
                         break;
                     case 'i':   // includeFile=<pat>
-                        if (ValidOption("includefile", cmd+1))
+ 
+                        if (ValidOption("includefile", cmd+1, false))
                         {
                             ReplaceAll(value, "*", ".*");
                             includeFilePatList.push_back(getRegEx(value));
@@ -541,7 +566,26 @@ int main(int argc, char* argv[])
                         if (ValidOption("hide", cmd+1))
                             setShow(value, false);
                         break;
+                           
+                    case 'r':   // range=beg,end
+                        if (ValidOption("range", cmd+1))
+                        {
+                        char* nPtr;
+                        size_t n1 = strtoul(value, &nPtr, 10);
+                        size_t n2 = strtoul(nPtr+1, &nPtr, 10);
+                        if (n1 <= n2) {
+                            pFilter = &lineFilter;
+                            lineFilter.zones.push_back(Zone(n1, n2));
+                        }
+                        }
+                        break;
                             
+                    case 'p':
+                        if (ValidOption("printPos", cmd+1)) {
+                            printPosFmt = value;
+                        }
+                        break;
+                          
                     default:
                         std::cerr << "Unknown command " << cmd << std::endl;
                         optionErrCnt++;
@@ -551,8 +595,16 @@ int main(int argc, char* argv[])
                     if (endCmds == argv[argn]) {
                         doParseCmds = false;
                     } else {
-                        std::cerr << "Unknown command " << argStr << std::endl;
-                        optionErrCnt++;
+                        switch (argStr[1])
+                        {
+                        case 'i':
+                            inverseMatch = ValidOption("inverse", argStr+1, false);
+                            break;
+                        default:
+                            std::cerr << "Unknown command " << argStr << std::endl;
+                            optionErrCnt++;
+                            break;
+                        }
                     }
                 }
             }
@@ -568,12 +620,12 @@ int main(int argc, char* argv[])
             if (fileDirList.size() == 1 && fileDirList[0] == "-") {
                 string filePath;
                 while (std::getline(std::cin, filePath)) {
-                    std::cerr << "File Matches=" << ReplaceFiles(filePath) << std::endl;
+                    std::cerr << ReplaceFiles(filePath) << std::endl;
                 }
             } else {
                 for (auto const& filePath : fileDirList)
                 {
-                    std::cerr << "File Matches=" << ReplaceFiles(filePath) << std::endl;
+                    std::cerr << ReplaceFiles(filePath) << std::endl;
                 }
             }
         }

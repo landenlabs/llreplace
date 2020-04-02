@@ -1,12 +1,13 @@
-#llreplace
+# llreplace
 OSX / Linux / DOS  File find and replace text command line tool.
 
 LLReplace searches file text data using regular expression and replaces matches with substitution text.
 
   [![Build status](https://travis-ci.org/landenlabs/llreplace.svg?branch=master)](https://travis-ci.org/landenlabs/llreplace)
+  [![Known Vulnerabilities](https://snyk.io/test/github/landenlabs/llreplace/badge.svg)](https://snyk.io/test/github/landenlabs/llreplace)
+
   
-  
-Help screen
+**Help screen**
 
 <pre>
 llreplace  Dennis Lang v1.1 (landenlabs.com) Jan  9 2020
