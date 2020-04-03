@@ -65,6 +65,7 @@ public:
     virtual
     void init(std::vector<char>& buffer) {
         pBuffer = &buffer;
+        lastPos = lineCnt = 0;
     }
     
     virtual
@@ -85,14 +86,12 @@ public:
         lastPos = pos;
     }
     
-    bool inZones(size_t lineNum) {
+    bool inZones(size_t lineNum) const {
         auto it = zones.begin();
         while (it != zones.end())
         {
-            Zone& zone = *it;
-            if (lineNum > zone.second) {
-                it = zones.erase(it);
-            } else if (lineNum >= zone.first && lineNum <= zone.second) {
+            const Zone& zone = *it;
+            if (lineNum >= zone.first && lineNum <= zone.second) {
                 return true;
             } else {
                 ++it;

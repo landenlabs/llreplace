@@ -73,7 +73,7 @@ bool inverseMatch = false;
 uint optionErrCnt = 0;
 uint patternErrCnt = 0;
 
-lstring printPosFmt = "(%o,%l)";
+lstring printPosFmt = "%f(%o)\n";
 lstring cwd;    // current working directory
 
 // Working values
@@ -269,11 +269,11 @@ void printParts(
                     printf(itemFmt, Directory_files::parts(filepath, false, true, true).c_str());
                     break;
                 case 'o':
-                    itemFmt += "ul";    // unsigned long formatter
+                    itemFmt += "lu";    // unsigned long formatter
                     printf(itemFmt, fileOffset);
                     break;
                 case 'l':
-                    itemFmt += "ul";    // unsigned long formatter
+                    itemFmt += "lu";    // unsigned long formatter
                     printf(itemFmt, matchLen);
                     break;
                 case 'm':
@@ -373,7 +373,7 @@ bool ReplaceFile(const lstring& filepath, const lstring& filename)
 {
     ifstream        in;
     ofstream        out;
-    struct stat      filestat;
+    struct stat     filestat;
     std::regex_constants::match_flag_type flags = std::regex_constants::match_default;
 
     try {
@@ -392,8 +392,9 @@ bool ReplaceFile(const lstring& filepath, const lstring& filename)
             const char* endPtr = begPtr + inCnt;
             pFilter->init(buffer);
             
+            // WARNING - LineFilter only validates first match and not multiple replacements.
             if (std::regex_search(begPtr, endPtr, match, fromPat, flags)
-                && pFilter->valid(match.position(),match.length()))
+                && pFilter->valid(match.position(), match.length()))
             {
                 if (!backupDir.empty())
                 {
@@ -404,12 +405,11 @@ bool ReplaceFile(const lstring& filepath, const lstring& filename)
                 out.open(filepath);
                 if (out.is_open())
                 {
-                    // cout.write(begPtr, match.position(0));
+                    // TODO - support LineFilter validation. 
                     std::regex_replace(std::ostreambuf_iterator<char>(out),
                        begPtr,
                        endPtr,
                        fromPat, toPat, flags);
-                
                 
                     out.close();
                     return true;
@@ -688,6 +688,10 @@ int main(int argc, char* argv[])
             char cwdTmp[256];
             cwd = getcwd(cwdTmp, sizeof(cwdTmp));
             cwd += Directory_files::SLASH;
+            
+            if (!toPat.empty() && pFilter == &lineFilter) {
+                cerr << "\a\nRange filter does not work for replacement only searching\a\n" << std::endl;
+            }
             
             if (fileDirList.size() == 1 && fileDirList[0] == "-") {
                 string filePath;
