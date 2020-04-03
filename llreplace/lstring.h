@@ -78,6 +78,12 @@ public:
     {
         return lstring(std::string::substr(pos, len));
     }
+    
+    lstring& replaceStr(const char* from, const char* to) {
+        size_t pos = find(from);
+        replace(pos, strlen(from), to);
+        return *this;
+    }
 
     lstring& trim()
     {

@@ -105,9 +105,11 @@ public:
     // Utility to join directory and name
     static lstring& join(lstring& outPath, const char* inDir, const char* inName);
     
-    static lstring SLASH;  // "/" linux, or "\" windows
-
+    static lstring SLASH;   // "/" linux, or "\" windows
+    static lstring EXTN;    // '.'
     
+    static lstring parts(const char* fullpat, bool dir, bool name, bool ext);
+
 private:
     Directory_files(const Directory_files &);
     Directory_files &operator=(const Directory_files &);

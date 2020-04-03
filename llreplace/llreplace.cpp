@@ -54,6 +54,7 @@
 #include <exception>
 using namespace std;
 
+
 // Helper types
 typedef std::vector<lstring> StringList;
 typedef std::vector<std::regex> PatternList;
@@ -66,14 +67,14 @@ lstring backupDir;
 PatternList includeFilePatList;
 PatternList excludeFilePatList;
 StringList fileDirList;
-bool showFile = true;
-bool showMatch = true;
+
 bool showPattern = false;
 bool inverseMatch = false;
 uint optionErrCnt = 0;
 uint patternErrCnt = 0;
 
-lstring printPosFmt = "%.0s(%lu,%lu)";
+lstring printPosFmt = "(%o,%l)";
+lstring cwd;    // current working directory
 
 // Working values
 bool doReplace = false;
@@ -209,6 +210,87 @@ bool FileMatches(const lstring& inName, const PatternList& patternList, bool emp
 }
 
 // ---------------------------------------------------------------------------
+void printParts(
+        const char* customFmt,
+        const char* filepath,
+        size_t fileOffset,
+        size_t matchLen,
+        const lstring& matchStr)
+{
+    // TODO - handle custom printf syntax to get to path parts:
+    //    %#.#s    s=fullpath,  p=path only, n=name only, e=extension only f=filename name+ext
+    //    %0#d     o=offset,  l=length
+    // printf(filepath, fileOffset, len, filepath);
+    
+    const int NONE = 12345;
+    lstring itemFmt;
+    
+    char* fmt = (char*)customFmt;
+    while (*fmt) {
+        char c = *fmt;
+        if (c != '%') {
+            putchar(c);
+            fmt++;
+        } else {
+            const char* begFmt = fmt;
+            int precision = NONE;
+            int width = (int)strtol(fmt+1, &fmt, 10);
+            if (*fmt == '.') {
+                precision = (int)strtol(fmt+1, &fmt, 10);
+            }
+            c = *fmt;
+        
+            itemFmt = begFmt;
+            itemFmt.resize(fmt - begFmt);
+           
+            switch (c) {
+                case 's':
+                    itemFmt += "s";
+                    printf(itemFmt, filepath);
+                    break;
+                case 'p':
+                   itemFmt += "s";
+                   printf(itemFmt, Directory_files::parts(filepath, true, false, false).c_str());
+                   break;
+                case 'r':   // relative path
+                    itemFmt += "s";
+                    printf(itemFmt, Directory_files::parts(filepath, true, false, false).replaceStr(cwd, "").c_str());
+                    break;
+                case 'n':
+                    itemFmt += "s";
+                    printf(itemFmt, Directory_files::parts(filepath, false, true, false).c_str());
+                    break;
+                case 'e':
+                    itemFmt += "s";
+                    printf(itemFmt, Directory_files::parts(filepath, false, false, true).c_str());
+                    break;
+                case 'f':
+                    itemFmt += "s";
+                    printf(itemFmt, Directory_files::parts(filepath, false, true, true).c_str());
+                    break;
+                case 'o':
+                    itemFmt += "ul";    // unsigned long formatter
+                    printf(itemFmt, fileOffset);
+                    break;
+                case 'l':
+                    itemFmt += "ul";    // unsigned long formatter
+                    printf(itemFmt, matchLen);
+                    break;
+                case 'm':
+                    itemFmt += "s";
+                    printf(itemFmt, matchStr.c_str());
+                    break;
+                default:
+                    putchar(c);
+                    break;
+            }
+            fmt++;
+        }
+    }
+}
+
+
+// ---------------------------------------------------------------------------
 // Find 'fromPat' in file
 unsigned FindGrep(const char* filepath)
 {
@@ -260,11 +342,10 @@ unsigned FindGrep(const char* filepath)
                 off += pos;
                 
                 if (pFilter->valid(off, len)) {
-                    if (showMatch)
-                        printf(printPosFmt, filepath, off, len, filepath);
-                        // std::cout << "(" << off << "," << len << ")";
-                        std::cout << lstring(begPtr+pos, len) << std::endl;
-                     matchCnt++;
+                    if (!inverseMatch) {
+                        printParts(printPosFmt, filepath, off, len, lstring(begPtr+pos, len));
+                    }
+                    matchCnt++;
                 }
                 
                 begPtr += pos + len;
@@ -367,8 +448,7 @@ static size_t ReplaceFile(const lstring& fullname)
             if (ReplaceFile(fullname, name))
             {
                 fileCount++;
-                if (showFile)
-                    std::cout << fullname << std::endl;
+                printParts(printPosFmt, fullname, 0, 0, "");
             }
         }
         else
@@ -377,8 +457,7 @@ static size_t ReplaceFile(const lstring& fullname)
             if (matchCnt != 0)
             {
                 fileCount++;
-                if (showFile)
-                    std::cout << fullname << std::endl;
+                printParts(printPosFmt, fullname, 0, 0, "");
             }
         }
     }
@@ -424,18 +503,6 @@ static size_t ReplaceFiles(const lstring& dirname)
 
 
 // ---------------------------------------------------------------------------
-// set Show state for "match" or "file"
-void setShow(lstring value, bool state)
-{
-    if (value == "match")
-        showMatch = state;
-    else if (value == "file")
-        showFile = state;
-    else if (value == "pattern")
-        showPattern = state;
-}
-
-// ---------------------------------------------------------------------------
 // Return compiled regular expression from text.
 std::regex getRegEx(const char* value)
 {
@@ -479,7 +546,7 @@ int main(int argc, char* argv[])
 {  
     if (argc == 1)
     {
-        cerr << "\n" << argv[0] << "  Dennis Lang v1.1 (landenlabs.com) " __DATE__ << "\n"
+        cerr << "\n" << argv[0] << "  Dennis Lang v1.2 (landenlabs.com) " __DATE__ << "\n"
             << "\nDes: Replace text in files\n"
             "Use: llreplace [options] directories...\n"
             "\n"
@@ -490,21 +557,26 @@ int main(int argc, char* argv[])
             "\n"
             "   -includeFiles=<filePattern>    ; Optional files to include in file scan, default=*\n"
             "   -excludeFiles=<filePattern>    ; Optional files to exclude in file scan, no default\n"
-            "\n"
             "   -range=beg,end                 ; Optional line range filter \n"
-            "   -inverse                       ; Invert Search, show files not matching \n"
             "\n"
-            "   directories...                 ; Directories to scan"
+            "   directories...                 ; Directories to scan\n"
             "\n"
             "Other options:\n"
-            "   -show=<file|match|pattern>      ; Show file path, text match or patterns \n"
-            "   -hide=<file|match>              ; Hide showing file path or text macth \n"
-            "   -printPos='%d,%d'              ; Printf format to present match,  file, position, length, file \n"
-            "                                  ; Def: %.0s(%d,%d), ex (%-20.20s) or %.0s%d or %s,%d  \n"
+            "   -inverse                       ; Invert Search, show files not matching \n"
+            "   -printFmt='%o,%l'              ; Printf format to present match \n"
+            "                                  ; Def: (%o,%l), \n"
+            "  %s=fullpath, %p=path, %f=relative path %f=filename, %n=name only %e=extension \n"
+            "  %o=character offset, %l=match length %m=match string \n"
+            "\n"
+            "  ex: -printPos='%20.20f %08o'  \n"
+            "  Filename padded to 20 characters, max 20, and offset 8 digits leading zeros.\n"
             "\n"
             "Examples\n"
             " Search only, show patterns and defaults showing file and match:\n"
-            "  llreplace -show=pattern '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' -hide=match '-include=*.java' -range=0,10 -range=20,-1 -printPos='%03d: ' src\n"
+            "  llreplace -from='Copyright' '-include=*.java' -print='%r/%f\n' src1 src2\n"
+            "  llreplace -from='Copyright' '-include=*.java' -include='*.xml' -print='%s' -inverse src res\n"
+            "  llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]'  '-include=*.java' -range=0,10 -range=20,-1 -printFmt='%f %03d: ' src1 src2\n"
+            "\n"
             " Search and replace in-place:\n"
             "  llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' '-to=MapConfigInfo.$1$2$3' '-include=*.java' src\n"
             "\n";
@@ -544,7 +616,10 @@ int main(int argc, char* argv[])
                         }
                         break;
                     case 'i':   // includeFile=<pat>
- 
+                        if (ValidOption("inverse", argStr+1, false)) {
+                            inverseMatch = true;
+                        }
+                            
                         if (ValidOption("includefile", cmd+1, false))
                         {
                             ReplaceAll(value, "*", ".*");
@@ -557,14 +632,6 @@ int main(int argc, char* argv[])
                             ReplaceAll(value, "*", ".*");
                             excludeFilePatList.push_back(getRegEx(value));
                         }
-                        break;
-                    case 's':   // show=match|file
-                        if (ValidOption("show", cmd+1))
-                            setShow(value, true);
-                        break;
-                    case 'h':   // hide=match|file
-                        if (ValidOption("hide", cmd+1))
-                            setShow(value, false);
                         break;
                            
                     case 'r':   // range=beg,end
@@ -581,8 +648,9 @@ int main(int argc, char* argv[])
                         break;
                             
                     case 'p':
-                        if (ValidOption("printPos", cmd+1)) {
+                        if (ValidOption("printFmt", cmd+1)) {
                             printPosFmt = value;
+                            ConvertSpecialChar(printPosFmt);
                         }
                         break;
                           
@@ -617,6 +685,10 @@ int main(int argc, char* argv[])
     
         if (patternErrCnt == 0 && optionErrCnt == 0 && fileDirList.size() != 0)
         {
+            char cwdTmp[256];
+            cwd = getcwd(cwdTmp, sizeof(cwdTmp));
+            cwd += Directory_files::SLASH;
+            
             if (fileDirList.size() == 1 && fileDirList[0] == "-") {
                 string filePath;
                 while (std::getline(std::cin, filePath)) {

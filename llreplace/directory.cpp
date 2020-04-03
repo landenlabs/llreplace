@@ -46,6 +46,7 @@
 
 const lstring ANY("\\*");
 lstring Directory_files::SLASH = "\\";
+lstring Directory_files::EXTN = ".";
 
 //-------------------------------------------------------------------------------------------------
 // Return true if attribute is a Directory
@@ -182,6 +183,7 @@ lstring& Directory_files::fullName(lstring& fname) const
 #include <stdlib.h>
 
 lstring Directory_files::SLASH = "/";
+lstring Directory_files::EXTN = ".";
 
 //-------------------------------------------------------------------------------------------------
 
@@ -251,6 +253,52 @@ lstring& Directory_files::join(lstring& outFull, const char* dir, const char* na
     return outFull;
     // return GetFullPath(fname);
 }
+
+//-------------------------------------------------------------------------------------------------
+lstring getPartDir(const char* filepath) {
+    lstring result = filepath;
+    size_t endDir = result.find_last_of(Directory_files::SLASH);
+    if (endDir != string::npos)
+        result = result.substr(0, endDir);
+    return result;
+}
+
+lstring getPartName(const char* filepath) {
+    lstring result = filepath;
+    size_t endDir = result.find_last_of(Directory_files::SLASH);
+    if (endDir != string::npos)
+        result = result.substr(endDir+1);
+    size_t endName = result.find_last_of(Directory_files::EXTN);
+    if (endName != string::npos)
+        result.resize(endName);
+    return result;
+}
+
+lstring getPartExt(const char* filepath) {
+    lstring result = filepath;
+    size_t pos = result.find_last_of(Directory_files::EXTN);
+    return result.substr(pos);
+}
+
+
+lstring  Directory_files::parts(const char* filepath, bool dir, bool name, bool ext)
+{
+    // #include <filesystem>    
+    // std::filesystem::path pathParts = filepath;
+    
+    lstring result;
+    if (dir) {
+        result += getPartDir(filepath);
+    }
+    if (name) {
+        result += getPartName(filepath);
+    }
+    if (ext) {
+        result += getPartExt(filepath);
+    }
+    return result;
+}
+
 #endif
 
 
