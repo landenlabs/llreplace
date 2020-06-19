@@ -448,7 +448,7 @@ static size_t ReplaceFile(const lstring& fullname)
             if (ReplaceFile(fullname, name))
             {
                 fileCount++;
-                printParts(printPosFmt, fullname, 0, 0, "");
+                // printParts(printPosFmt, fullname, 0, 0, "");
             }
         }
         else
@@ -457,7 +457,7 @@ static size_t ReplaceFile(const lstring& fullname)
             if (matchCnt != 0)
             {
                 fileCount++;
-                printParts(printPosFmt, fullname, 0, 0, "");
+                // printParts(printPosFmt, fullname, 0, 0, "");
             }
         }
     }
@@ -542,44 +542,51 @@ bool ValidOption(const char* validCmd, const char* possibleCmd, bool reportErr =
 }
 
 // ---------------------------------------------------------------------------
+void help(const char* argv0) {
+    cerr << "\n" << argv0 << "  Dennis Lang v1.3 (LandenLabs.com) " __DATE__ << "\n"
+        << "\nDes: Replace text in files\n"
+        "Use: llreplace [options] directories...\n"
+        "\n"
+        "Main options:\n"
+        "   -from=<regExpression>          ; Pattern to find\n"
+        "   -to=<regExpression or string>  ; Optional replacment \n"
+        "   -backupDir=<directory>         ; Optional Path to store backup copy before change\n"
+        "\n"
+        "   -includeFiles=<filePattern>    ; Optional files to include in file scan, default=*\n"
+        "   -excludeFiles=<filePattern>    ; Optional files to exclude in file scan, no default\n"
+        "   -range=beg,end                 ; Optional line range filter \n"
+        "\n"
+        "   directories...                 ; Directories to scan\n"
+        "\n"
+        "Other options:\n"
+        "   -inverse                       ; Invert Search, show files not matching \n"
+        "   -printFmt='%o,%l'              ; Printf format to present match \n"
+        "                                  ; Def: %f(%o)\\n \n"
+        "  %s=fullpath, %p=path, %f=relative path %f=filename, %n=name only %e=extension \n"
+        "  %o=character offset, %l=match length %m=match string \n"
+        "\n"
+        "  ex: -printPos='%20.20f %08o'  \n"
+        "  Filename padded to 20 characters, max 20, and offset 8 digits leading zeros.\n"
+        "\n"
+        "Examples\n"
+        " NOTES:\n"
+        "   . (dot) does not match \r \n,  you need to use [\r\n] or  (.|\r|\n)* \n"
+        " Search only, show patterns and defaults showing file and match:\n"
+        "  llreplace -from='Copyright' '-include=*.java' -print='%r/%f\n' src1 src2\n"
+        "  llreplace -from='Copyright' '-include=*.java' -include='*.xml' -print='%s' -inverse src res\n"
+        "  llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]'  '-include=*.java' -range=0,10 -range=20,-1 -printFmt='%f %03d: ' src1 src2\n"
+        "\n"
+        " Search and replace in-place:\n"
+        "  llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' '-to=MapConfigInfo.$1$2$3' '-include=*.java' src\n"
+        "\n";
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {  
     if (argc == 1)
     {
-        cerr << "\n" << argv[0] << "  Dennis Lang v1.2 (landenlabs.com) " __DATE__ << "\n"
-            << "\nDes: Replace text in files\n"
-            "Use: llreplace [options] directories...\n"
-            "\n"
-            "Main options:\n"
-            "   -from=<regExpression>          ; Pattern to find\n"
-            "   -to=<regExpression or string>  ; Optional replacment \n"
-            "   -backupDir=<directory>         ; Optional Path to store backup copy before change\n"
-            "\n"
-            "   -includeFiles=<filePattern>    ; Optional files to include in file scan, default=*\n"
-            "   -excludeFiles=<filePattern>    ; Optional files to exclude in file scan, no default\n"
-            "   -range=beg,end                 ; Optional line range filter \n"
-            "\n"
-            "   directories...                 ; Directories to scan\n"
-            "\n"
-            "Other options:\n"
-            "   -inverse                       ; Invert Search, show files not matching \n"
-            "   -printFmt='%o,%l'              ; Printf format to present match \n"
-            "                                  ; Def: (%o,%l), \n"
-            "  %s=fullpath, %p=path, %f=relative path %f=filename, %n=name only %e=extension \n"
-            "  %o=character offset, %l=match length %m=match string \n"
-            "\n"
-            "  ex: -printPos='%20.20f %08o'  \n"
-            "  Filename padded to 20 characters, max 20, and offset 8 digits leading zeros.\n"
-            "\n"
-            "Examples\n"
-            " Search only, show patterns and defaults showing file and match:\n"
-            "  llreplace -from='Copyright' '-include=*.java' -print='%r/%f\n' src1 src2\n"
-            "  llreplace -from='Copyright' '-include=*.java' -include='*.xml' -print='%s' -inverse src res\n"
-            "  llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]'  '-include=*.java' -range=0,10 -range=20,-1 -printFmt='%f %03d: ' src1 src2\n"
-            "\n"
-            " Search and replace in-place:\n"
-            "  llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' '-to=MapConfigInfo.$1$2$3' '-include=*.java' src\n"
-            "\n";
+        help(argv[0]);
     }
     else
     {
@@ -595,6 +602,9 @@ int main(int argc, char* argv[])
                 {
                     lstring cmd = cmdValue[0];
                     lstring value = cmdValue[1];
+                    
+                    if (cmd.length() > 1 && cmd[0] == '-')
+                        cmd.erase(0);   // allow -- prefix on commands
                     
                     switch (cmd[1])
                     {
@@ -704,6 +714,8 @@ int main(int argc, char* argv[])
                     std::cerr << ReplaceFiles(filePath) << std::endl;
                 }
             }
+        } else {
+            help(argv[0]);
         }
         
         std::cerr << std::endl;
