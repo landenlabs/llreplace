@@ -46,6 +46,7 @@
 #include "directory.h"
 #include "split.h"
 #include "filters.h"
+#include "colors.h"
 
 #include <vector>
 #include <map>
@@ -67,6 +68,8 @@ lstring backupDir;
 PatternList includeFilePatList;
 PatternList excludeFilePatList;
 StringList fileDirList;
+lstring outFile;
+lstring printPat;
 
 bool showPattern = false;
 bool inverseMatch = false;
@@ -280,6 +283,15 @@ void printParts(
                     itemFmt += "s";
                     printf(itemFmt, matchStr.c_str());
                     break;
+                case 't':   // match convert using printPat
+                    itemFmt += "s";
+                    if (printPat.length() == 0) {
+                        printf("Missing -printPat=pattern");
+                    } else {
+                        std::regex_constants::match_flag_type flags = std::regex_constants::match_default;
+                        printf(itemFmt, std::regex_replace(matchStr, fromPat, printPat, flags).c_str());
+                    }
+                    break;
                 default:
                     putchar(c);
                     break;
@@ -367,20 +379,22 @@ unsigned FindGrep(const char* filepath)
 
 // ---------------------------------------------------------------------------
 // Find fromPat and Replace with toPat in filepath.
-//  filepath = full file name path
-//  filename = name only part
-bool ReplaceFile(const lstring& filepath, const lstring& filename)
+//  inFilepath = full file name path
+//  outfilePath = full file name paht, can be same as inFilepath
+//  backupToName = name only part
+bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const lstring& backupToName)
 {
     ifstream        in;
     ofstream        out;
+   
     struct stat     filestat;
     std::regex_constants::match_flag_type flags = std::regex_constants::match_default;
 
     try {
-        if (stat(filepath, &filestat) != 0)
+        if (stat(inFilepath, &filestat) != 0)
             return false;
         
-        in.open(filepath);
+        in.open(inFilepath);
         if (in.good())
         {
             buffer.resize(filestat.st_size);
@@ -399,45 +413,52 @@ bool ReplaceFile(const lstring& filepath, const lstring& filename)
                 if (!backupDir.empty())
                 {
                     lstring backupFull;
-                    rename(filepath, Directory_files::join(backupFull, backupDir, filename));
+                    rename(inFilepath, Directory_files::join(backupFull, backupDir, backupToName));
                 }
                 
-                out.open(filepath);
-                if (out.is_open())
-                {
-                    // TODO - support LineFilter validation. 
-                    std::regex_replace(std::ostreambuf_iterator<char>(out),
-                       begPtr,
-                       endPtr,
-                       fromPat, toPat, flags);
-                
+                ostream* outPtr = &cout;
+                if (outFilepath != "-") {
+                    out.open(outFilepath);
+                    if (out.is_open())
+                    {
+                        outPtr = &out;
+                    } else {
+                        cerr << strerror(errno) << ", Unable to write to " << outFilepath << endl;
+                        return false;
+                    }
+                }
+ 
+                // TODO - support LineFilter validation.
+                std::regex_replace(std::ostreambuf_iterator<char>(*outPtr),
+                        begPtr,
+                        endPtr,
+                        fromPat, toPat, flags);
+          
+                if (out.is_open()) {
                     out.close();
-                    return true;
-                } else {
-                    cerr << strerror(errno) << ", Unable to write to " << filepath << endl;
-                    return false;
                 }
+                return true;
             }
         }
         else
         {
-            cerr << strerror(errno) << ", Unable to open " << filepath << endl;
+            cerr << strerror(errno) << ", Unable to open " << inFilepath << endl;
         }
     }
     catch (exception ex)
     {
-        cerr << ex.what() << ", Error in file:" << filepath << endl;
+        cerr << ex.what() << ", Error in file:" << inFilepath << endl;
     }
     return false;
 }
 
 
 // ---------------------------------------------------------------------------
-static size_t ReplaceFile(const lstring& fullname)
+static size_t ReplaceFile(const lstring& inFullname)
 {
     size_t fileCount = 0;
     lstring name;
-    getName(name, fullname);
+    getName(name, inFullname);
     
     if (!name.empty()
         && !FileMatches(name, excludeFilePatList, false)
@@ -445,7 +466,8 @@ static size_t ReplaceFile(const lstring& fullname)
     {
         if (doReplace)
         {
-            if (ReplaceFile(fullname, name))
+            string outFullname = (outFile.length() != 0) ? outFile : inFullname;
+            if (ReplaceFile(inFullname, outFullname, name))
             {
                 fileCount++;
                 // printParts(printPosFmt, fullname, 0, 0, "");
@@ -453,7 +475,7 @@ static size_t ReplaceFile(const lstring& fullname)
         }
         else
         {
-            unsigned matchCnt = FindGrep(fullname);
+            unsigned matchCnt = FindGrep(inFullname);
             if (matchCnt != 0)
             {
                 fileCount++;
@@ -542,43 +564,59 @@ bool ValidOption(const char* validCmd, const char* possibleCmd, bool reportErr =
 }
 
 // ---------------------------------------------------------------------------
+template<typename TT>
+std::string stringer(const TT& value) {
+    return string(value);
+}
+template<typename TT, typename ... Args >
+std::string stringer(const TT& value, const Args& ... args) {
+    return string(value) + stringer(args...);
+}
+
+// ---------------------------------------------------------------------------
 void help(const char* argv0) {
-    cerr << "\n" << argv0 << "  Dennis Lang v1.3 (LandenLabs.com) " __DATE__ << "\n"
-        << "\nDes: Replace text in files\n"
+    const char* helpMsg = "  Dennis Lang v1.4 (LandenLabs.com) " __DATE__  "\n"
+        "\nDes: Replace text in files\n"
         "Use: llreplace [options] directories...\n"
         "\n"
-        "Main options:\n"
-        "   -from=<regExpression>          ; Pattern to find\n"
-        "   -to=<regExpression or string>  ; Optional replacment \n"
-        "   -backupDir=<directory>         ; Optional Path to store backup copy before change\n"
+        "_P_Main options:_X_\n"
+        "   -_y_from=<regExpression>          ; Pattern to find\n"
+        "   -_y_to=<regExpression or string>  ; Optional replacment \n"
+        "   -_y_backupDir=<directory>         ; Optional Path to store backup copy before change\n"
+        "   -_y_out= - | outfilepath          ; Optional alternate output, default is input file \n"
         "\n"
-        "   -includeFiles=<filePattern>    ; Optional files to include in file scan, default=*\n"
-        "   -excludeFiles=<filePattern>    ; Optional files to exclude in file scan, no default\n"
-        "   -range=beg,end                 ; Optional line range filter \n"
+        "   -_y_includeFiles=<filePattern>    ; Optional files to include in file scan, default=*\n"
+        "   -_y_excludeFiles=<filePattern>    ; Optional files to exclude in file scan, no default\n"
+        "   -_y_range=beg,end                 ; Optional line range filter \n"
         "\n"
         "   directories...                 ; Directories to scan\n"
         "\n"
-        "Other options:\n"
-        "   -inverse                       ; Invert Search, show files not matching \n"
-        "   -printFmt='%o,%l'              ; Printf format to present match \n"
+        "_P_Other options:_X_\n"
+        "   -_y_inverse                       ; Invert Search, show files not matching \n"
+        "   -_y_printFmt='%o,%l'              ; Printf format to present match \n"
         "                                  ; Def: %f(%o)\\n \n"
         "  %s=fullpath, %p=path, %f=relative path %f=filename, %n=name only %e=extension \n"
-        "  %o=character offset, %l=match length %m=match string \n"
+        "  %o=character offset, %l=match length %m=match string %t=match convert using toPattern \n"
         "\n"
-        "  ex: -printPos='%20.20f %08o'  \n"
+        "  ex: -_y_printPos='%20.20f %08o'  \n"
         "  Filename padded to 20 characters, max 20, and offset 8 digits leading zeros.\n"
         "\n"
-        "Examples\n"
-        " NOTES:\n"
-        "   . (dot) does not match \r \n,  you need to use [\r\n] or  (.|\r|\n)* \n"
-        " Search only, show patterns and defaults showing file and match:\n"
-        "  llreplace -from='Copyright' '-include=*.java' -print='%r/%f\n' src1 src2\n"
-        "  llreplace -from='Copyright' '-include=*.java' -include='*.xml' -print='%s' -inverse src res\n"
-        "  llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]'  '-include=*.java' -range=0,10 -range=20,-1 -printFmt='%f %03d: ' src1 src2\n"
+        "_p_NOTES:\n"
+        "   . (dot) does not match \\r \\n,  you need to use [\\r\\n] or  (.|\\r|\\n)* \n"
+        "   Use single quotes to wrap from and/or to patterns if they use special characters\n"
+        "   like $ dollar signt to prevent shell from interception it.\n"
         "\n"
-        " Search and replace in-place:\n"
-        "  llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' '-to=MapConfigInfo.$1$2$3' '-include=*.java' src\n"
+        "_p_Examples\n"
+        " Search only, show patterns and defaults showing file and match:\n"
+        "  llreplace -_y_from='Copyright' '-_y_include=*.java' -_y_print='%r/%f\\n' src1 src2\n"
+        "  llreplace -_y_from='Copyright' '-_y_include=*.java' -_y_include='*.xml' -_y_print='%s' -_y_inverse src res\n"
+        "  llreplace '-_y_from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]'  '-_y_include=*.java' -_y_range=0,10 -_y_range=20,-1 -_y_printFmt='%f %03d: ' src1 src2\n"
+        "\n"
+        " _P_Search and replace in-place:_X_\n"
+        "  llreplace '-_y_from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' '-_y_to=MapConfigInfo.$1$2$3' '-_y_include=*.java' src\n"
         "\n";
+    
+    std::cerr << Colors::colorize(stringer("\n_W_", argv0, "_X_").c_str()) << Colors::colorize(helpMsg);
 }
 
 // ---------------------------------------------------------------------------
@@ -614,6 +652,7 @@ int main(int argc, char* argv[])
                         break;
                     case 'f':   // from=<pat>
                         if (ValidOption("from", cmd+1))
+                            ConvertSpecialChar(value);
                             fromPat = getRegEx(value);
                         break;
                     case 't':   // to=<pat>
@@ -657,10 +696,17 @@ int main(int argc, char* argv[])
                         }
                         break;
                             
+                    case 'o':   // alternate output
+                        if (ValidOption("out", cmd+1))
+                            outFile = value;
+                        break;
                     case 'p':
-                        if (ValidOption("printFmt", cmd+1)) {
+                        if (ValidOption("printFmt", cmd+1, false)) {
                             printPosFmt = value;
                             ConvertSpecialChar(printPosFmt);
+                        } else if (ValidOption("printPat", cmd+1)) {
+                            printPat = value;
+                            ConvertSpecialChar(printPat);
                         }
                         break;
                           

@@ -9,7 +9,7 @@
 // Author: Dennis Lang - 2020
 // http://landenlabs.com
 //
-// This file is part of llcsv project.
+// This file is part of llreplace project.
 //
 // ----- License ----
 //
@@ -35,15 +35,15 @@
 #pragma once
 
 #include <string>
-
+#include <regex>
 using namespace std;
 
 //-------------------------------------------------------------------------------------------------
 // Replace using regular expression
 inline string& replaceRE(string& inOut, const char* findRE, const char* replaceWith)
 {
-    regex pattern(findRE);
-    regex_constants::match_flag_type flags = regex_constants::match_default;
+    std::regex pattern(findRE);
+    std::regex_constants::match_flag_type flags = regex_constants::match_default;
     inOut = regex_replace(inOut, pattern, replaceWith, flags);
     return inOut;
 }
