@@ -744,7 +744,8 @@ int main(int argc, char* argv[]) {
                         } else if (parser.validOption("to", cmdName))  {
                             toPat = value;
                             ParseUtil::convertSpecialChar(toPat);
-                            ParseUtil::dumpStr("To", toPat);
+                            if (showPattern)
+                                ParseUtil::dumpStr("To", toPat);
                             doReplace = true;
                         }
                         break;
