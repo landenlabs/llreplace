@@ -38,9 +38,9 @@
 // Project files
 #include "ll_stdhdr.hpp"
 #include "directory.hpp"
-#include "split.hpp"
+#include "parseutil.hpp"
 #include "filters.hpp"
-#include "colors.hpp"
+
 
 #include <assert.h>
 #include <stdio.h>
@@ -58,11 +58,10 @@
 #include <exception>
 #include <chrono>   // Timing program execution
 
-using namespace std;
+ 
 
 // Helper types
 typedef std::vector<lstring> StringList;
-typedef std::vector<std::regex> PatternList;
 typedef unsigned int uint;
 
 // Runtime options
@@ -81,6 +80,8 @@ std::regex endPat;
 lstring backupDir;
 PatternList includeFilePatList;
 PatternList excludeFilePatList;
+PatternList includePathPatList;
+PatternList excludePathPatList;
 StringList fileDirList;
 lstring outFile;
 lstring printPat;
@@ -92,7 +93,6 @@ bool inverseMatch = false;
 bool canForce = false;          // Can update read-only file.
 uint optionErrCnt = 0;
 uint patternErrCnt = 0;
-std::set<std::string> parseArgSet;
 const char EOL_CHR = '\n';
 const char* EOL_STR = "\n";
 
@@ -135,97 +135,7 @@ Filter* pFilter = &nopFilter;
 unsigned long g_regSearchCnt = 0;
 unsigned long g_fileCnt = 0;
 
-// ---------------------------------------------------------------------------
-// Dump String, showing non-printable has hex value.
-static void DumpStr(const char* label, const std::string& str) {
-    if (showPattern) {
-        std::cerr << "Pattern " << label << " length=" << str.length() << std::endl;
-        for (int idx = 0; idx < str.length(); idx++) {
-            std::cerr << "  [" << idx << "]";
-            if (isprint(str[idx]))
-                std::cerr << str[idx] << std::endl;
-            else
-                std::cerr << "(hex) " << std::hex << (unsigned)str[idx] << std::dec << std::endl;
-        }
-        std::cerr << "[end-of-pattern]\n";
-    }
-}
 
-// ---------------------------------------------------------------------------
-// Convert special characters from text to binary.
-static std::string& ConvertSpecialChar(std::string& inOut) {
-    uint len = 0;
-    int x, n, scnt;
-    const char* inPtr = inOut.c_str();
-    char* outPtr = (char*)inPtr;
-    while (*inPtr) {
-        if (*inPtr == '\\') {
-            inPtr++;
-            switch (*inPtr) {
-            case 'n': *outPtr++ = '\n'; break;
-            case 't': *outPtr++ = '\t'; break;
-            case 'v': *outPtr++ = '\v'; break;
-            case 'b': *outPtr++ = '\b'; break;
-            case 'r': *outPtr++ = '\r'; break;
-            case 'f': *outPtr++ = '\f'; break;
-            case 'a': *outPtr++ = '\a'; break;
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-                scnt = sscanf(inPtr, "%3o%n", &x, &n);  // "\010" octal sets x=8 and n=3 (characters)
-                assert(scnt == 1);
-                inPtr += n - 1;
-                *outPtr++ = (char)x;
-                break;
-            case 'x':								// hexadecimal
-                scnt = sscanf(inPtr + 1, "%2x%n", &x, &n);  // "\1c" hex sets x=28 and n=2 (characters)
-                assert(scnt == 1);
-                if (n > 0) {
-                    inPtr += n;
-                    *outPtr++ = (char)x;
-                    break;
-                }
-            // seep through
-            default:
-                throw( "Warning: unrecognized escape sequence" );
-            case '\\':
-            case '\?':
-            case '\'':
-            case '\"':
-                *outPtr++ = *inPtr;
-                break;
-            }
-            inPtr++;
-        } else
-            *outPtr++ = *inPtr++;
-        len++;
-    }
-
-    inOut.resize(len);
-    return inOut;;
-}
-
-#ifdef WIN32
-    const char SLASH_CHAR('\\');
-#else
-    const char SLASH_CHAR('/');
-#endif
-
-// ---------------------------------------------------------------------------
-// Extract name part from path.
-lstring& getName(lstring& outName, const lstring& inPath) {
-    size_t nameStart = inPath.rfind(SLASH_CHAR) + 1;
-    if (nameStart == 0)
-        outName = inPath;
-    else
-        outName = inPath.substr(nameStart);
-    return outName;
-}
 
 // ---------------------------------------------------------------------------
 // Return true if inPath (filename part) matches pattern in patternList
@@ -602,12 +512,11 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
     return false;
 }
 
-
 // ---------------------------------------------------------------------------
 static size_t ReplaceFile(const lstring& inFullname) {
     size_t fileCount = 0;
     lstring name;
-    getName(name, inFullname);
+    Directory_files::getName(name, inFullname);
 
     if (! name.empty()
         && ! FileMatches(name, excludeFilePatList, false)
@@ -657,7 +566,10 @@ static size_t ReplaceFiles(const lstring& dirname) {
     while (directory.more()) {
         directory.fullName(fullname);
         if (directory.is_directory()) {
+            if(! FileMatches(fullname, excludePathPatList, false)
+               && FileMatches(fullname, includePathPatList, true)) {
             fileCount += ReplaceFiles(fullname);
+           }
         } else if (fullname.length() > 0) {
             fileCount += ReplaceFile(fullname);
         }
@@ -667,41 +579,6 @@ static size_t ReplaceFiles(const lstring& dirname) {
 }
 
 
-// ---------------------------------------------------------------------------
-// Return compiled regular expression from text.
-std::regex getRegEx(const char* value) {
-    try {
-        std::string valueStr(value);
-        ConvertSpecialChar(valueStr);
-        DumpStr("From", valueStr);
-        return std::regex(valueStr);
-        // return std::regex(valueStr, regex_constants::icase);
-    } catch (const std::regex_error& regEx) {
-        std::cerr << regEx.what() << ", Pattern=" << value << std::endl;
-    }
-
-    patternErrCnt++;
-    return std::regex("");
-}
-
-// ---------------------------------------------------------------------------
-// Validate option matchs and optionally report problem to user.
-bool ValidOption(const char* validCmd, const char* possibleCmd, bool reportErr = true) {
-    // Starts with validCmd else mark error
-    size_t validLen = strlen(validCmd);
-    size_t possibleLen = strlen(possibleCmd);
-
-    if ( strncasecmp(validCmd, possibleCmd, std::min(validLen, possibleLen)) == 0) {
-        parseArgSet.insert(validCmd);
-        return true;
-    }
-
-    if (reportErr) {
-        std::cerr << "Unknown option:'" << possibleCmd << "', expect:'" << validCmd << "'\n";
-        optionErrCnt++;
-    }
-    return false;
-}
 
 // ---------------------------------------------------------------------------
 template<typename TT>
@@ -728,8 +605,10 @@ void showHelp(const char* argv0) {
         "   -_y_backupDir=<directory>         ; Optional Path to store backup copy before change\n"
         "   -_y_out= - | outfilepath          ; Optional alternate output, default is input file \n"
         "\n"
-        "   -_y_includeFiles=<filePattern>    ; Optional files to include in file scan, default=*\n"
-        "   -_y_excludeFiles=<filePattern>    ; Optional files to exclude in file scan, no default\n"
+        "   -_y_includeFile=<filePattern>     ; Include files by regex match \n"
+        "   -_y_excludeFile=<filePattern>     ; Exclude files by regex match \n"
+        "   -_y_IncludePath=<pathPattern>     ; Include path by regex match \n"
+        "   -_y_ExcludePath=<pathPattern>     ; Exclude path by regex match \n"
         "   -_y_range=beg,end                 ; Optional line range filter \n"
         "   -_y_force                         ; Allow updates on read-only files \n"
         "\n"
@@ -767,13 +646,9 @@ void showHelp(const char* argv0) {
 }
 
 // ---------------------------------------------------------------------------
-void showUnknown(const char* argStr) {
-    std::cerr << Colors::colorize("Use -h for help.\n_Y_Unknown option _R_") << argStr << Colors::colorize("_X_\n");
-    optionErrCnt++;
-}
-
-// ---------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
+    ParseUtil parser;
+    
     if (argc == 1) {
         showHelp(argv[0]);
     } else {
@@ -793,46 +668,47 @@ int main(int argc, char* argv[]) {
                     const char* cmdName = cmd + 1;
                     switch (*cmdName) {
                     case 'b':   // backup path
-                        if (ValidOption("backupdir", cmdName, false))
+                        if (parser.validOption("backupdir", cmdName, false))
                             backupDir = value;
-                        else if (ValidOption("begin", cmdName, false)) {
-                            ConvertSpecialChar(value);
-                            beginPat = getRegEx(value);
+                        else if (parser.validOption("begin", cmdName, false)) {
+                            ParseUtil::convertSpecialChar(value);
+                            beginPat = parser.getRegEx(value);
                             // doLineByLine = value.find("\n") == std::string::npos;
                         }
                         break;
                     case 'f':   // from=<pat>
-                        if (ValidOption("from", cmdName)) {
-                            ConvertSpecialChar(value);
-                            fromPat = getRegEx(value);
+                        if (parser.validOption("from", cmdName)) {
+                            fromPat = parser.getRegEx(ParseUtil::convertSpecialChar(value));
                             findMode = FROM;
                             // doLineByLine = value.find("\n") == std::string::npos;
                         }
                         break;
 
-                    case 'i':   // includeFile=<pat>
-                        if (ValidOption("ignore", cmdName, false)) {
-                            ConvertSpecialChar(value);
-                            ignorePat = getRegEx(value);
+                    case 'i': // -ignore=<pattern>
+                        if (parser.validOption("ignore", cmdName, false)) {
+                            ParseUtil::convertSpecialChar(value);
+                            ignorePat = parser.getRegEx(value);
                             // doLineByLine = value.find("\n") == std::string::npos;
-                        } else if (ValidOption("includeFile", cmdName))  {
-                            ReplaceAll(value, "*", ".*");
-                            includeFilePatList.push_back(getRegEx(value));
+                        } else {  // includeFile=<pat>
+                            parser.validPattern(includeFilePatList, value, "includeFile", cmdName);
                         }
                         break;
                     case 'e':   // excludeFile=<pat>
-                        if (ValidOption("excludeFile", cmdName, false)) {
-                            ReplaceAll(value, "*", ".*");
-                            excludeFilePatList.push_back(getRegEx(value));
-                        } else  if (ValidOption("end", cmdName)) {
-                            ConvertSpecialChar(value);
-                            endPat = getRegEx(value);
+                        if (parser.validPattern(excludeFilePatList, value, "excludeFile", cmdName, false)) {
+                        } else  if (parser.validOption("end", cmdName)) {
+                            ParseUtil::convertSpecialChar(value);
+                            endPat = parser.getRegEx(value);
                             // doLineByLine = value.find("\n") == std::string::npos;
                         }
                         break;
-
+                    case 'E':   // ExcludePath=<pat>
+                        parser.validPattern(excludePathPatList, value, "ExcludePath", cmdName);
+                        break;
+                    case 'I':   // IncludePath=<pat>
+                        parser.validPattern(includePathPatList, value, "IncludePath", cmdName);
+                        break;
                     case 'r':   // range=beg,end
-                        if (ValidOption("range", cmdName))  {
+                        if (parser.validOption("range", cmdName))  {
                             char* nPtr;
                             size_t n1 = strtoul(value, &nPtr, 10);
                             size_t n2 = strtoul(nPtr + 1, &nPtr, 10);
@@ -846,44 +722,44 @@ int main(int argc, char* argv[]) {
                         break;
 
                     case 'o':   // alternate output
-                        if (ValidOption("out", cmdName))
+                        if (parser.validOption("out", cmdName))
                             outFile = value;
                         break;
                     case 'p':
-                        if (ValidOption("printFmt", cmdName, false)) {
+                        if (parser.validOption("printFmt", cmdName, false)) {
                             printPosFmt = value;
-                            ConvertSpecialChar(printPosFmt);
-                        } else if (ValidOption("printPat", cmdName)) {
+                            ParseUtil::convertSpecialChar(printPosFmt);
+                        } else if (parser.validOption("printPat", cmdName)) {
                             printPat = value;
-                            ConvertSpecialChar(printPat);
+                            ParseUtil::convertSpecialChar(printPat);
                         }
                         break;
 
                     case 't':   // to=<pat>
-                        if (ValidOption("till", cmdName, false))  {
-                            ConvertSpecialChar(value);
-                            tillPat = getRegEx(value);
+                        if (parser.validOption("till", cmdName, false))  {
+                            ParseUtil::convertSpecialChar(value);
+                            tillPat = parser.getRegEx(value);
                             findMode = FROM_TILL;
                             doLineByLine = true;
-                        } else if (ValidOption("to", cmdName))  {
+                        } else if (parser.validOption("to", cmdName))  {
                             toPat = value;
-                            ConvertSpecialChar(toPat);
-                            DumpStr("To", toPat);
+                            ParseUtil::convertSpecialChar(toPat);
+                            ParseUtil::dumpStr("To", toPat);
                             doReplace = true;
                         }
                         break;
 
                     case 'u':   // until=<pat>
-                        if (ValidOption("until", cmdName)) {
-                            ConvertSpecialChar(value);
-                            untilPat = getRegEx(value);
+                        if (parser.validOption("until", cmdName)) {
+                            ParseUtil::convertSpecialChar(value);
+                            untilPat = parser.getRegEx(value);
                             findMode = FROM_UNTIL;
                             doLineByLine = true;
                         }
                         break;
 
                     default:
-                        showUnknown(argStr);
+                            parser.showUnknown(argStr);
                         break;
                     }
                 } else {
@@ -893,16 +769,16 @@ int main(int argc, char* argv[]) {
                         const char* cmdName = argStr + 1;
                         switch (argStr[1]) {
                         case 'f':
-                            canForce = ValidOption("force", cmdName, true);
+                            canForce = parser.validOption("force", cmdName, true);
                             break;
                         case 'i':
-                            inverseMatch = ValidOption("inverse", cmdName, true);
+                            inverseMatch = parser.validOption("inverse", cmdName, true);
                             break;
                         case 'v':
-                            isVerbose = ValidOption("verbose", cmdName, true);
+                            isVerbose = parser.validOption("verbose", cmdName, true);
                             break;
                         default:
-                            showUnknown(argStr);
+                            parser.showUnknown(argStr);
                             break;
                         }
                     }
@@ -913,7 +789,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        if (parseArgSet.count("from") == 0) {
+        if (parser.parseArgSet.count("from") == 0) {
             std::cerr << "Missing -from='pattern' \n";
             return 0;
         }

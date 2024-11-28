@@ -20,14 +20,14 @@
 //          }
 //-------------------------------------------------------------------------------------------------
 //
-// Author: Dennis Lang - 2015
+// Author: Dennis Lang - 2024
 // https://landenlabs.com
 //
-// This file is part of JavaTree project.
+// This file is part of llreplace project.
 //
 // ----- License ----
 //
-// Copyright (c) 2015 Dennis Lang
+// Copyright (c) 2024 Dennis Lang
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -47,7 +47,10 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
+
 #include "ll_stdhdr.hpp"
+
+
 #ifdef HAVE_WIN
     #include <windows.h>
 #else
@@ -72,7 +75,19 @@
     const DWORD FILE_ATTRIBUTE_WRIT = S_IWUSR; // has write permission
     const DWORD FILE_ATTRIBUTE_EXEC = S_IXUSR; // has execute permission
 
+#endif
 
+#ifdef HAVE_WIN
+    const char SLASH_CHAR('\\');
+    #include <assert.h>
+    #define strncasecmp _strnicmp
+    #if !defined(S_ISREG) && defined(S_IFMT) && defined(S_IFREG)
+        #define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+    #endif
+#else
+    const char SLASH_CHAR('/');
+    // #include <time.h>
+    #include <sys/fcntl.h>
 #endif
 
 class DirEntry;
@@ -96,7 +111,7 @@ public:
     const char* name() const;
 
     // Return directory path and entry name.
-    lstring& fullName(lstring& fname) const;
+    const lstring& fullName(lstring& fname) const;
 
     // Close current directory
     void close();
@@ -104,14 +119,24 @@ public:
     // Utility to join directory and name
     static lstring& join(lstring& outPath, const char* inDir, const char* inName);
 
-    static lstring SLASH;   // "/" linux, or "\" windows
-    static lstring EXTN;    // '.'
+   // Return true if path points to  a file or directory
+    static bool exists(const char* path);
+
+    static const lstring SLASH;     // "/" linux, or "\" windows
+    static const char SLASH_CHAR;   // '/'  linux, or '\' windows
+    static const lstring SLASH2;     // "//" linux, or "/\" windows
+
+    static lstring& getDir(lstring& outName, const lstring& inPath);
+    static lstring& getName(lstring& outName, const lstring& inPath);
+    static lstring& getExt(lstring& outExt, const lstring& inPath);
+    static bool deleteFile(const char* inPath);
+    static bool setPermission(const char* inPath, unsigned permission, bool setAllParts = false);
 
     static lstring parts(const char* fullpat, bool dir, bool name, bool ext);
 
 private:
     Directory_files(const Directory_files&);
-    Directory_files& operator=(const Directory_files&);
+    // Directory_files& operator=(const Directory_files&);
 
 #ifdef HAVE_WIN
     WIN32_FIND_DATA my_dirent;      // Data structure describes the file found

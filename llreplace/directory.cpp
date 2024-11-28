@@ -4,14 +4,14 @@
 //
 //-------------------------------------------------------------------------------------------------
 //
-// Author: Dennis Lang - 2015
+// Author: Dennis Lang - 2024
 // https://landenlabs.com
 //
-// This file is part of JavaTree project.
+// This file is part of llrename project.
 //
 // ----- License ----
 //
-// Copyright (c) 2015 Dennis Lang
+// Copyright (c) 2024  Dennis Lang
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,23 +30,36 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#include "ll_stdhdr.hpp"
 #include "directory.hpp"
 
 #include <iostream>
+#include <stdio.h>
+#include <errno.h>
 
 #ifdef HAVE_WIN
     #include <windows.h>
 #endif
 
-#include <stdio.h>
-#include <errno.h>
-#include "ll_stdhdr.hpp"
+const char EXTN_CHAR = '.';
 
-#ifdef WIN32
+#ifdef HAVE_WIN
+
+// #include <sys/stat.h>
+// #include <sys/types.h>
+#include <io.h>
+// #include <stdio.h>
+
+typedef unsigned short mode_t;
+
+static const mode_t S_IRUSR = mode_t(_S_IREAD);     //  read by user
+static const mode_t S_IWUSR = mode_t(_S_IWRITE);    //  write by user
+#define chmod _chmod
 
 const lstring ANY("\\*");
-lstring Directory_files::SLASH = "\\";
-lstring Directory_files::EXTN = ".";
+const lstring Directory_files::SLASH = "\\";
+const char Directory_files::SLASH_CHAR = '\\';
+const lstring Directory_files::SLASH2 = "\\\\";
 
 //-------------------------------------------------------------------------------------------------
 // Return true if attribute is a Directory
@@ -64,21 +77,18 @@ static lstring& GetFullPath(lstring& fname) {
 }
 
 //-------------------------------------------------------------------------------------------------
-
 Directory_files::Directory_files(const lstring& dirName) :
     my_dir_hnd(INVALID_HANDLE_VALUE),
     my_dirName(dirName) {
 }
 
 //-------------------------------------------------------------------------------------------------
-
 Directory_files::~Directory_files() {
     if (my_dir_hnd != INVALID_HANDLE_VALUE)
         FindClose(my_dir_hnd);
 }
 
 //-------------------------------------------------------------------------------------------------
-
 void Directory_files::close() {
     if (my_dir_hnd != INVALID_HANDLE_VALUE) {
         FindClose(my_dir_hnd);
@@ -87,7 +97,6 @@ void Directory_files::close() {
 }
 
 //-------------------------------------------------------------------------------------------------
-
 bool Directory_files::begin() {
     close();
 
@@ -96,6 +105,8 @@ bool Directory_files::begin() {
         dir = ".";    // Default to current directory
 
     DWORD attr = GetFileAttributes(dir);
+    int err = GetLastError();       // Error 3 = invalid path.
+
     if (isDir(attr)) {
         dir += ANY;
     } else { // if (attr != INVALID_FILE_ATTRIBUTES)
@@ -119,7 +130,6 @@ bool Directory_files::begin() {
 }
 
 //-------------------------------------------------------------------------------------------------
-
 bool Directory_files::more() {
     if (my_dir_hnd == INVALID_HANDLE_VALUE)
         return begin();
@@ -140,23 +150,26 @@ bool Directory_files::more() {
 }
 
 //-------------------------------------------------------------------------------------------------
-
 bool Directory_files::is_directory() const {
     return (my_dir_hnd != INVALID_HANDLE_VALUE && isDir(my_dirent.dwFileAttributes));
 }
 
 //-------------------------------------------------------------------------------------------------
-
 const char* Directory_files::name() const {
     return (my_dir_hnd != INVALID_HANDLE_VALUE) ?
         my_dirent.cFileName : NULL;
 }
 
 //-------------------------------------------------------------------------------------------------
-
-lstring& Directory_files::fullName(lstring& fname) const {
+const lstring& Directory_files::fullName(lstring& fname) const {
     fname = my_dirName + SLASH + name();
     return GetFullPath(fname);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool Directory_files::exists( const char* path) {
+    const DWORD attr = GetFileAttributes(path);
+    return (attr != INVALID_FILE_ATTRIBUTES);
 }
 
 
@@ -165,11 +178,11 @@ lstring& Directory_files::fullName(lstring& fname) const {
 #include <unistd.h>
 #include <stdlib.h>
 
-lstring Directory_files::SLASH = "/";
-lstring Directory_files::EXTN = ".";
+const lstring Directory_files::SLASH = "/";
+const char Directory_files::SLASH_CHAR = '/';
+const lstring Directory_files::SLASH2 = "//";
 
 //-------------------------------------------------------------------------------------------------
-
 Directory_files::Directory_files(const lstring& dirName) {
     realpath(dirName.c_str(), my_fullname);
     my_baseDir = my_fullname;
@@ -178,14 +191,12 @@ Directory_files::Directory_files(const lstring& dirName) {
 }
 
 //-------------------------------------------------------------------------------------------------
-
 Directory_files::~Directory_files() {
     if (my_pDir != NULL)
         closedir(my_pDir);
 }
 
 //-------------------------------------------------------------------------------------------------
-
 bool Directory_files::more() {
     if (my_is_more) {
         my_pDirEnt = readdir(my_pDir);
@@ -204,15 +215,98 @@ bool Directory_files::more() {
 }
 
 //-------------------------------------------------------------------------------------------------
-
 bool Directory_files::is_directory() const {
     return my_pDirEnt->d_type == DT_DIR;
 }
 
 //-------------------------------------------------------------------------------------------------
+const char* Directory_files::name() const {
+    return my_pDirEnt->d_name;
+}
 
-lstring& Directory_files::fullName(lstring& fname) const {
+//-------------------------------------------------------------------------------------------------
+const lstring& Directory_files::fullName(lstring& fname) const {
     return join(fname, my_baseDir, my_pDirEnt->d_name);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool Directory_files::exists(const char* path) {
+    return access(path, F_OK) == 0;
+
+}
+#endif
+
+//-------------------------------------------------------------------------------------------------
+// Extract directory part from path.
+lstring& Directory_files::getDir(lstring& outDir, const lstring& inPath) {
+    size_t nameStart = inPath.rfind(SLASH_CHAR);
+    if (nameStart == string::npos)
+        outDir.clear();
+    else
+        outDir = inPath.substr(0, nameStart);
+    return outDir;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Extract name part from path.
+lstring& Directory_files::getName(lstring& outName, const lstring& inPath) {
+    size_t nameStart = inPath.rfind(SLASH_CHAR);
+    if (nameStart == std::string::npos)
+        outName = inPath;
+    else
+        outName = inPath.substr(nameStart + 1);
+    return outName;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Extract name part from path.
+lstring& Directory_files::getExt(lstring& outExt, const lstring& inPath) {
+    size_t extPos = inPath.rfind(EXTN_CHAR);
+    if (extPos == std::string::npos)
+        outExt = "";
+    else
+        outExt = inPath.substr(extPos + 1);
+    return outExt;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Extract name part from path.
+bool Directory_files::deleteFile(const char* inPath) {
+    int err = remove(inPath);
+    if (err != 0) {
+        if (errno == EPERM || errno == EACCES)
+            setPermission(inPath, S_IWUSR);
+        err = remove(inPath);
+    }
+
+    if (err != 0)
+        std::cerr << strerror(errno) << " deleting " << inPath << std::endl;
+    else
+        std::cerr << "Deleted " << inPath << std::endl;
+
+
+    return (err == 0);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Set permission on relative path file and directories.
+bool Directory_files::setPermission(const char* relPath, unsigned permission, bool setAllParts) {
+    if (relPath == nullptr || strlen(relPath) <= 1)
+        return true;
+
+    lstring dir;
+    struct stat pathStat;
+    int err = stat(relPath, &pathStat);
+    if (err == 0) {
+        if ((pathStat.st_mode & permission) != permission) {
+            err = chmod(relPath, pathStat.st_mode | permission);
+            // Windows
+            // SetFileAttributes(filename, attributes | FILE_ATTRIBUTE_READONLY)
+        }
+        if (setAllParts)
+            return setPermission(getDir(dir, relPath), permission, true);
+    }
+    return (err == 0);
 }
 
 
@@ -241,7 +335,7 @@ lstring getPartName(const char* filepath) {
     size_t endDir = result.find_last_of(Directory_files::SLASH);
     if (endDir != string::npos)
         result = result.substr(endDir + 1);
-    size_t endName = result.find_last_of(Directory_files::EXTN);
+    size_t endName = result.find_last_of(EXTN_CHAR);
     if (endName != string::npos)
         result.resize(endName);
     return result;
@@ -249,7 +343,7 @@ lstring getPartName(const char* filepath) {
 
 lstring getPartExt(const char* filepath) {
     lstring result = filepath;
-    size_t pos = result.find_last_of(Directory_files::EXTN);
+    size_t pos = result.find_last_of(EXTN_CHAR);
     return result.substr(pos);
 }
 
@@ -270,8 +364,3 @@ lstring  Directory_files::parts(const char* filepath, bool dir, bool name, bool 
     }
     return result;
 }
-
-#endif
-
-
-
