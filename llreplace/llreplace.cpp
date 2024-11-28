@@ -7,7 +7,7 @@
 //-------------------------------------------------------------------------------------------------
 //
 // Author: Dennis Lang - 2016
-// http://landenlabs.com/
+// https://landenlabs.com/
 //
 // This file is part of llreplace project.
 //
@@ -350,47 +350,56 @@ unsigned FindFileGrep(const char* filepath) {
     ofstream        out;
     struct stat     filestat;
     uint            matchCnt = 0;
-
+    const uint      MAX_FILE_SIZE = 1024 * 1024 * 20;
 
     try {
         if (stat(filepath, &filestat) != 0)
             return 0;
 
         in.open(filepath);
-        if (in.good() && filestat.st_size > 0) {
-            buffer.resize(filestat.st_size);
-            buffer[0] = EOL_CHR;
-            streamsize inCnt = in.read(buffer.data() + 1, buffer.size()).gcount();
-            in.close();
-
-            std::match_results <const char*> match;
-            const char* begPtr = (const char*)buffer.data() + 1;
-            const char* endPtr = begPtr + inCnt;
-            size_t off = 0;
-            pFilter->init(buffer);
-
-            g_fileCnt++;
-            while (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)) {
-                g_regSearchCnt++;
-                // for (auto group : match)
-                //    std::cout << group << endl;
-
-                size_t pos = match.position();
-                size_t len = match.length();
-                // size_t numMatches = match.size();
-                // std::string matchedStr = match.str();
-                // std::string m0 = match[0];
-
-                off += pos;
-
-                if (pFilter->valid(off, len)) {
-                    if (! inverseMatch) {
-                        printParts(printPosFmt, filepath, off, len, lstring(begPtr + pos, len), strchrRev(begPtr + pos, EOL_CHR) +1);
+        if (in.good() && filestat.st_size > 0 && S_ISREG(filestat.st_mode)) {
+            if (filestat.st_size > MAX_FILE_SIZE) {
+                cerr << "File too large " << filepath << " " << filestat.st_size << std::endl;
+                return 0;
+            }
+            try {
+                buffer.resize(filestat.st_size);
+                buffer[0] = EOL_CHR;
+                streamsize inCnt = in.read(buffer.data() + 1, buffer.size()).gcount();
+                in.close();
+                
+                std::match_results <const char*> match;
+                const char* begPtr = (const char*)buffer.data() + 1;
+                const char* endPtr = begPtr + inCnt;
+                size_t off = 0;
+                pFilter->init(buffer);
+                
+                g_fileCnt++;
+                while (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)) {
+                    g_regSearchCnt++;
+                    // for (auto group : match)
+                    //    std::cout << group << endl;
+                    
+                    size_t pos = match.position();
+                    size_t len = match.length();
+                    // size_t numMatches = match.size();
+                    // std::string matchedStr = match.str();
+                    // std::string m0 = match[0];
+                    
+                    off += pos;
+                    
+                    if (pFilter->valid(off, len)) {
+                        if (! inverseMatch) {
+                            printParts(printPosFmt, filepath, off, len, lstring(begPtr + pos, len), strchrRev(begPtr + pos, EOL_CHR) +1);
+                        }
+                        matchCnt++;
                     }
-                    matchCnt++;
+                    
+                    begPtr += pos + len;
                 }
-
-                begPtr += pos + len;
+            } catch (exception ex) {
+                int err = errno;
+                cerr << "File read exception on " << filepath << " " << strerror(err) << std::endl;
             }
             return inverseMatch ? (matchCnt > 0 ? 0 : 1) : matchCnt;
         } else {
@@ -782,7 +791,7 @@ int main(int argc, char* argv[]) {
                         cmd.erase(0);   // allow -- prefix on commands
                     
                     const char* cmdName = cmd + 1;
-                    switch (cmd[1]) {
+                    switch (*cmdName) {
                     case 'b':   // backup path
                         if (ValidOption("backupdir", cmdName, false))
                             backupDir = value;

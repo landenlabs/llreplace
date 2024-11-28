@@ -5,7 +5,7 @@
 //-------------------------------------------------------------------------------------------------
 //
 // Author: Dennis Lang - 2016
-// http://landenlabs.com
+// https://landenlabs.com
 //
 // This file is part of llreplace project.
 //

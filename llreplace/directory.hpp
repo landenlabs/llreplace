@@ -21,7 +21,7 @@
 //-------------------------------------------------------------------------------------------------
 //
 // Author: Dennis Lang - 2015
-// http://landenlabs.com
+// https://landenlabs.com
 //
 // This file is part of JavaTree project.
 //
