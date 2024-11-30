@@ -91,6 +91,7 @@ bool doLineByLine = false;      // What is this for ?, should it be a switch
 bool showPattern = false;
 bool inverseMatch = false;
 bool canForce = false;          // Can update read-only file.
+bool progress = true;           // Show progress
 uint optionErrCnt = 0;
 uint patternErrCnt = 0;
 const char EOL_CHR = '\n';
@@ -253,6 +254,13 @@ const char* strchrRev(const char* sPtr, char want) {
 }
 
 // ---------------------------------------------------------------------------
+void fileProgress(const char* filePath) {
+     g_fileCnt++;
+    if ((g_fileCnt % 100) == 0)
+        std::cerr << "\r" << "Files:" << g_fileCnt << " ";
+}
+
+// ---------------------------------------------------------------------------
 // Find 'fromPat' in file
 unsigned FindFileGrep(const char* filepath) {
     lstring         filename;
@@ -269,7 +277,7 @@ unsigned FindFileGrep(const char* filepath) {
         in.open(filepath);
         if (in.good() && filestat.st_size > 0 && S_ISREG(filestat.st_mode)) {
             if (filestat.st_size > MAX_FILE_SIZE) {
-                cerr << "File too large " << filepath << " " << filestat.st_size << std::endl;
+                Colors::showError("File too large ", filepath, " ", filestat.st_size);
                 return 0;
             }
             try {
@@ -284,7 +292,7 @@ unsigned FindFileGrep(const char* filepath) {
                 size_t off = 0;
                 pFilter->init(buffer);
                 
-                g_fileCnt++;
+                fileProgress(filepath);   // g_fileCnt++;
                 while (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)) {
                     g_regSearchCnt++;
                     // for (auto group : match)
@@ -309,15 +317,14 @@ unsigned FindFileGrep(const char* filepath) {
                 }
             } catch (exception ex) {
                 int err = errno;
-                cerr << "File read exception on " << filepath << " " << strerror(err) << std::endl;
+                Colors::showError("File read exception on ", filepath, " ", strerror(err));
             }
             return inverseMatch ? (matchCnt > 0 ? 0 : 1) : matchCnt;
-        } else {
-            cerr << "Unable to open " << filepath << endl;
+        } else if (in.bad()) {
+            Colors::showError("Unable to open ", filepath);
         }
     } catch (exception ex) {
-        cerr << "Parsing error in file:" << filepath << endl;
-        cerr << ex.what() << std::endl;
+        Colors::showError(ex.what(), " Parsing error in file:",  filepath);
     }
     return 0;
 }
@@ -337,7 +344,7 @@ unsigned FindLineGrep(const char* filepath) {
             return 0;
 
         in.open(filepath);
-        if (in.good()) {
+        if (in.good() && filestat.st_size > 0 && S_ISREG(filestat.st_mode)) {
             // std::match_results <std::string> match;
             std::smatch match;
 
@@ -346,7 +353,7 @@ unsigned FindLineGrep(const char* filepath) {
             pFilter->init(buffer);
             std::string lineBuffer;
 
-            g_fileCnt++;
+            fileProgress(filepath);   // g_fileCnt++;
             while (getline(in, lineBuffer)) {
                 if (std::regex_search(lineBuffer.cbegin(), lineBuffer.cend(), match, fromPat, rxFlags))   {
                     g_regSearchCnt++;
@@ -370,45 +377,14 @@ unsigned FindLineGrep(const char* filepath) {
                 }
             }
             return inverseMatch ? (matchCnt > 0 ? 0 : 1) : matchCnt;
-        } else {
-            cerr << "Unable to open " << filepath << endl;
+        } else if (!in.good()) {
+            Colors::showError("Unable to open ", filepath);
         }
     } catch (exception ex) {
-        cerr << "Parsing error in file:" << filepath << endl;
-        cerr << ex.what() << std::endl;
+        Colors::showError(ex.what(), " Parsing error in file:",  filepath);
     }
 
     return 0;
-}
-
-
-// ---------------------------------------------------------------------------
-static bool isWriteableFile(const struct stat& info) {
-
-#ifdef HAVE_WIN
-    size_t mask = _S_IFREG + _S_IWRITE;
-#else
-    size_t mask = S_IFREG + S_IWRITE;
-#endif
-    return ((info.st_mode & mask) == mask);
-}
-
-// ---------------------------------------------------------------------------
-static bool makeWriteableFile(const char* filePath, struct stat* info) {
-    struct stat tmpStat;
-
-    if (info == nullptr) {
-        info = &tmpStat;
-        if (stat(filePath, info) != 0)
-            return false;
-    }
-#ifdef HAVE_WIN
-    size_t mask = _S_IFREG + _S_IWRITE;
-    return _chmod(filePath, info.st_mode | mask) == 0;
-#else
-    size_t mask = S_IFREG + S_IWRITE;
-    return chmod(filePath, info->st_mode | mask) == 0;
-#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -427,8 +403,8 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
             return false;
 
         in.open(inFilepath);
-        if (in.good()) {
-            g_fileCnt++;
+        if (in.good() && filestat.st_size > 0 && S_ISREG(filestat.st_mode)) {
+            fileProgress(inFilepath);   // g_fileCnt++;
             buffer.resize(filestat.st_size);
             streamsize inCnt = in.read(buffer.data(), buffer.size()).gcount();
             in.close();
@@ -451,12 +427,12 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
                 ostream* outPtr = &cout;
                 if (outFilepath != "-") {
                     if (canForce)
-                        makeWriteableFile(outFilepath, nullptr);
+                        Directory_files::makeWriteableFile(outFilepath, nullptr);
                     out.open(outFilepath);
                     if (out.is_open()) {
                         outPtr = &out;
                     } else {
-                        cerr << strerror(errno) << ", Unable to write to " << outFilepath << endl;
+                        Colors::showError(strerror(errno), ", Unable to write to ", outFilepath);
                         return false;
                     }
                 }
@@ -503,11 +479,11 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
                 }
                 return true;
             }
-        } else {
-            cerr << strerror(errno) << ", Unable to open " << inFilepath << endl;
+        } else if (!in.good()) {
+            Colors::showError(strerror(errno), ", Unable to open ", inFilepath);
         }
     } catch (exception ex) {
-        cerr << ex.what() << ", Error in file:" << inFilepath << endl;
+        Colors::showError(ex.what(), ", Error in file:", inFilepath);
     }
     return false;
 }
@@ -593,7 +569,7 @@ std::string stringer(const TT& value, const Args& ... args) {
 // ---------------------------------------------------------------------------
 void showHelp(const char* argv0) {
     const char* helpMsg =
-        "  Dennis Lang v1.6 (LandenLabs.com) " __DATE__  "\n"
+        "  Dennis Lang v2.1 (LandenLabs.com) " __DATE__  "\n"
         "\nDes: Replace text in files\n"
         "Use: llreplace [options] directories...\n"
         "\n"
@@ -760,7 +736,7 @@ int main(int argc, char* argv[]) {
                         break;
 
                     default:
-                            parser.showUnknown(argStr);
+                        parser.showUnknown(argStr);
                         break;
                     }
                 } else {
@@ -791,7 +767,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (parser.parseArgSet.count("from") == 0) {
-            std::cerr << "Missing -from='pattern' \n";
+            Colors::showError("Missing -from='pattern'");
             return 0;
         }
 
@@ -804,7 +780,7 @@ int main(int argc, char* argv[]) {
             cwd += Directory_files::SLASH;
 
             if (! toPat.empty() && pFilter != &nopFilter) {
-                cerr << "\a\nRange filter does not work for replacement only searching\a\n" << std::endl;
+                Colors::showError("\a\nRange filter does not work for replacement only searching\a");
             }
             if (pFilter != &nopFilter) {
                 pFilter = doLineByLine ? ((Filter*)&lineFilter) : ((Filter*)&bufferFilter);
@@ -839,7 +815,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "FilesChecked=" << g_fileCnt << endl;
             std::cerr << "FilesMatched=" << fileMatchCnt << endl;
             if (toPat.empty() || doLineByLine) {
-                std::cerr << "LineMatches=" <<  g_regSearchCnt << endl;
+                std::cerr << "LinesMatched=" <<  g_regSearchCnt << endl;
             }
 
         } else {

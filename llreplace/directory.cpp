@@ -236,6 +236,25 @@ bool Directory_files::exists(const char* path) {
 }
 #endif
 
+// ---------------------------------------------------------------------------
+// [static]
+bool Directory_files::makeWriteableFile(const char* filePath, struct stat* info) {
+    struct stat tmpStat;
+
+    if (info == nullptr) {
+        info = &tmpStat;
+        if (stat(filePath, info) != 0)
+            return false;
+    }
+#ifdef HAVE_WIN
+    size_t mask = _S_IFREG + _S_IWRITE;
+    return _chmod(filePath, info.st_mode | mask) == 0;
+#else
+    size_t mask = S_IFREG + S_IWRITE;
+    return chmod(filePath, info->st_mode | mask) == 0;
+#endif
+}
+
 //-------------------------------------------------------------------------------------------------
 // Extract directory part from path.
 lstring& Directory_files::getDir(lstring& outDir, const lstring& inPath) {

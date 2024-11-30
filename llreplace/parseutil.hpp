@@ -34,6 +34,7 @@
 
 #include "ll_stdhdr.hpp"
 
+#include <iostream>
 #include <set>
 #include <regex>
 typedef std::vector<std::regex> PatternList;
@@ -47,8 +48,8 @@ public:
     std::set<std::string> parseArgSet;
     
     void showUnknown(const char* argStr);
+    
     std::regex getRegEx(const char* value);
- 
     bool validOption(const char* validCmd, const char* possibleCmd, bool reportErr = true);
     bool validPattern(PatternList& outList, lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr = true);
  
@@ -174,5 +175,15 @@ public:
         replaceRE(str, "_X_", OFF);
         return str;
     }
+
+    // Show error in RED
+    template<typename T, typename... Args>
+    static void showError(T first, Args&&... args) {
+        std::cerr << Colors::colorize("_R_");
+        std::cerr << first;
+        ((std::cerr << args << " "), ...);
+        std::cerr << Colors::colorize("_X_\n");
+    }
+
 };
 
