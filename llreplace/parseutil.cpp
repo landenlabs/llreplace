@@ -39,7 +39,14 @@
 #include <fstream>
 #include <regex>
 
+#ifdef HAVE_WIN
+#define strncasecmp _strnicmp
+#endif
+
+using namespace std;
+
 typedef unsigned int uint;
+
 
 // ---------------------------------------------------------------------------
 // Dump String, showing non-printable has hex value.
@@ -70,8 +77,8 @@ std::regex ParseUtil::getRegEx(const char* value) {
         // dumpStr("From", valueStr);
         return std::regex(valueStr);
         // return std::regex(valueStr, regex_constants::icase);
-    }  catch (const std::regex_error& regEx)   {
-        Colors::showError("Invalid regular expression ",  regEx.what(), ", Pattern=", value);
+    } catch (const std::regex_error& regEx) {
+        Colors::showError("Invalid regular expression ", regEx.what(), ", Pattern=", value);
     }
 
     patternErrCnt++;
@@ -79,7 +86,7 @@ std::regex ParseUtil::getRegEx(const char* value) {
 }
 
 //-------------------------------------------------------------------------------------------------
-// Validate option matchs and optionally report problem to user.
+// Validate option matches and optionally report problem to user.
 bool ParseUtil::validOption(const char* validCmd, const char* possibleCmd, bool reportErr) {
     // Starts with validCmd else mark error
     size_t validLen = strlen(validCmd);
@@ -91,7 +98,7 @@ bool ParseUtil::validOption(const char* validCmd, const char* possibleCmd, bool 
     }
 
     if (reportErr) {
-        std::cerr << Colors::colorize("_R_Unknown option:'")  << possibleCmd << "', expect:'" << validCmd << Colors::colorize("'_X_\n");
+        std::cerr << Colors::colorize("_R_Unknown option:'") << possibleCmd << "', expect:'" << validCmd << Colors::colorize("'_X_\n");
         optionErrCnt++;
     }
     return false;
@@ -100,7 +107,7 @@ bool ParseUtil::validOption(const char* validCmd, const char* possibleCmd, bool 
 //-------------------------------------------------------------------------------------------------
 bool ParseUtil::validPattern(PatternList& outList, lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr) {
     bool isOk = validOption(validCmd, possibleCmd, reportErr);
-    if (isOk)  {
+    if (isOk) {
         ReplaceAll(value, "*", ".*");
         ReplaceAll(value, "?", ".");
         outList.push_back(getRegEx(value));
@@ -168,7 +175,7 @@ lstring& ParseUtil::convertSpecialChar(lstring& inOut) {
                     *outPtr++ = (char)x;
                     break;
                 }
-            // seep through
+                // seep through
             default:
                 Colors::showError("Warning: unrecognized escape sequence:", inPtr);
                 throw( "Warning: unrecognized escape sequence" );

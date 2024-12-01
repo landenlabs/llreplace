@@ -58,7 +58,13 @@
 #include <exception>
 #include <chrono>   // Timing program execution
 
- 
+#ifdef HAVE_WIN
+#define getcwd _getcwd
+
+#include <sys/stat.h>
+#include <direct.h> // _getcwd
+#endif
+
 
 // Helper types
 typedef std::vector<lstring> StringList;

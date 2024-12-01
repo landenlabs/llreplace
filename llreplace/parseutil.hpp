@@ -34,9 +34,16 @@
 
 #include "ll_stdhdr.hpp"
 
+
+#ifdef HAVE_WIN
+#include <windows.h>
+#include <stdio.h>
+#endif
+
 #include <iostream>
-#include <set>
 #include <regex>
+#include <set>
+
 typedef std::vector<std::regex> PatternList;
 
 //-------------------------------------------------------------------------------------------------
@@ -53,18 +60,21 @@ public:
     bool validOption(const char* validCmd, const char* possibleCmd, bool reportErr = true);
     bool validPattern(PatternList& outList, lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr = true);
  
-    bool validFile(fstream& stream, int mode, const lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr = true);
+    bool validFile(std::fstream& stream, int mode, const lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr = true);
     
-    static lstring& convertSpecialChar(lstring& inOut);
+    static 
+    lstring& convertSpecialChar(lstring& inOut);
 
-    static lstring& getParts(
+    static 
+    lstring& getParts(
             lstring& outPart,
             const char* partSelector,
             const char* name,
             const char* ext,
             unsigned num );
     
-    static void dumpStr(const char* label, const std::string& str);
+    static 
+    void dumpStr(const char* label, const std::string& str);
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -117,16 +127,16 @@ public:
 
 //-------------------------------------------------------------------------------------------------
 // Replace using regular expression
-inline string& replaceRE(string& inOut, const char* findRE, const char* replaceWith) {
-    regex pattern(findRE);
-    regex_constants::match_flag_type flags = regex_constants::match_default;
-    inOut = regex_replace(inOut, pattern, replaceWith, flags);
+inline std::string& replaceRE(std::string& inOut, const char* findRE, const char* replaceWith) {
+    std::regex pattern(findRE);
+    std::regex_constants::match_flag_type flags = std::regex_constants::match_default;
+    inOut = std::regex_replace(inOut, pattern, replaceWith, flags);
     return inOut;
 }
 
 class Colors {
 public:
-#ifdef HAVE_WIN
+
 #define RED    "\033[01;31m"
 #define GREEN  "\033[01;32m"
 #define YELLOW "\033[01;33m"
@@ -135,16 +145,7 @@ public:
 #define LBLUE  "\033[01;36m"
 #define WHITE  "\033[01;37m"
 #define OFF    "\033[00m"
-#else
-#define RED    "\033[01;31m"
-#define GREEN  "\033[01;32m"
-#define YELLOW "\033[01;33m"
-#define BLUE   "\033[01;34m"
-#define PINK   "\033[01;35m"
-#define LBLUE  "\033[01;36m"
-#define WHITE  "\033[01;37m"
-#define OFF    "\033[00m"
-#endif
+
 
     static string colorize(const char* inStr) {
 #ifdef HAVE_WIN
@@ -176,14 +177,26 @@ public:
         return str;
     }
 
+    template <typename... Things>
+    static void cerrArgs(Things... things) {
+        for (const auto p : {things...}) {
+            std::cerr << p << std::endl;
+        }
+    }
+
     // Show error in RED
     template<typename T, typename... Args>
-    static void showError(T first, Args&&... args) {
+    static void showError(T first, Args... args) {
         std::cerr << Colors::colorize("_R_");
         std::cerr << first;
+// #ifdef HAVE_WIN
+//        cerrArgs(args...);
+// #else
         ((std::cerr << args << " "), ...);
+// #endif
         std::cerr << Colors::colorize("_X_\n");
     }
+   
 
 };
 

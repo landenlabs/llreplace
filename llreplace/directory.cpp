@@ -45,12 +45,13 @@ const char EXTN_CHAR = '.';
 
 #ifdef HAVE_WIN
 
-// #include <sys/stat.h>
-// #include <sys/types.h>
+#include <stdio.h>
 #include <io.h>
-// #include <stdio.h>
+#include <Windows.h>
 
 typedef unsigned short mode_t;
+
+using namespace std;
 
 static const mode_t S_IRUSR = mode_t(_S_IREAD);     //  read by user
 static const mode_t S_IWUSR = mode_t(_S_IWRITE);    //  write by user
@@ -247,8 +248,8 @@ bool Directory_files::makeWriteableFile(const char* filePath, struct stat* info)
             return false;
     }
 #ifdef HAVE_WIN
-    size_t mask = _S_IFREG + _S_IWRITE;
-    return _chmod(filePath, info.st_mode | mask) == 0;
+    unsigned short mask = _S_IFREG + _S_IWRITE;
+    return _chmod(filePath, info->st_mode | mask) == 0;
 #else
     size_t mask = S_IFREG + S_IWRITE;
     return chmod(filePath, info->st_mode | mask) == 0;
