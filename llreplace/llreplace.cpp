@@ -575,7 +575,7 @@ std::string stringer(const TT& value, const Args& ... args) {
 // ---------------------------------------------------------------------------
 void showHelp(const char* argv0) {
     const char* helpMsg =
-        "  Dennis Lang v2.1 (LandenLabs.com) " __DATE__  "\n"
+        "  Dennis Lang v2.2 (LandenLabs.com) " __DATE__  "\n"
         "\nDes: Replace text in files\n"
         "Use: llreplace [options] directories...\n"
         "\n"
@@ -643,14 +643,14 @@ int main(int argc, char* argv[]) {
                 if (argStr.find("=") != string::npos && cmdValue.size() >= 1) {
                     lstring cmd = cmdValue[0];
                     lstring value = cmdValue[1];
-                    
-                    if (cmd.length() > 1 && cmd[0] == '-')
-                        cmd.erase(0);   // allow -- prefix on commands
-                    
+
                     const char* cmdName = cmd + 1;
+                    if (cmd.length() > 2 && *cmdName == '-')
+                        cmdName++;  // allow -- prefix on commands
+
                     switch (*cmdName) {
                     case 'b':   // backup path
-                        if (parser.validOption("backupdir", cmdName, false))
+                        if (parser.validOption("backupDir", cmdName, false))
                             backupDir = value;
                         else if (parser.validOption("begin", cmdName, false)) {
                             ParseUtil::convertSpecialChar(value);
@@ -750,7 +750,9 @@ int main(int argc, char* argv[]) {
                         doParseCmds = false;
                     } else {
                         const char* cmdName = argStr + 1;
-                        switch (argStr[1]) {
+                        if (argStr.length() > 2 && *cmdName == '-')
+                            cmdName++;  // allow -- prefix on commands
+                        switch (*cmdName) {
                         case 'f':
                             canForce = parser.validOption("force", cmdName, true);
                             break;
