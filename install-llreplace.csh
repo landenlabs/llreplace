@@ -1,18 +1,22 @@
 #!/bin/csh -f
 
 set app=llreplace
-set buildType=Release
-xcodebuild -list -project ${app}.xcodeproj
+# xcodebuild -list -project ${app}.xcodeproj
 
 # rm -rf DerivedData/
-xcodebuild -derivedDataPath ./DerivedData/${app} -scheme ${app}  -configuration ${buildType} clean build
-# xcodebuild -configuration ${buildType} -alltargets clean
+# xcodebuild -configuration Release -alltargets clean
+# xcodebuild -derivedDataPath ./DerivedData/lldupdir -scheme $app -configuration Release clean build
+xcodebuild -scheme $app -configuration Release clean build
 
-echo ---------------------
-find ./DerivedData -type f -name ${app} -perm +444 -ls
+# echo -----------------------
+# find ./DerivedData -type f -name $app -perm +111 -ls
+set src=./DerivedData/$app/Build/Products/Release/$app
+set src=./DerivedData/Build/Products/Release/$app
 
-echo ---------------------
-set src=./DerivedData/Build/Products/${buildType}/${app}
-echo File=$src
-ls -al $src
+echo
+echo "---Install $src"
 cp $src ~/opt/bin/
+
+echo
+echo "---Files "
+ls -al $src  ~/opt/bin/$app

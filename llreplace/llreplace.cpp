@@ -157,6 +157,51 @@ bool FileMatches(const lstring& inName, const PatternList& patternList, bool emp
     return false;
 }
 
+
+const char EXTN_CHAR = '.';
+// ---------------------------------------------------------------------------
+lstring getPartDir(const char* filepath) {
+    lstring result = filepath;
+    size_t endDir = result.find_last_of(Directory_files::SLASH);
+    if (endDir != string::npos)
+        result = result.substr(0, endDir);
+    return result;
+}
+// ---------------------------------------------------------------------------
+lstring getPartName(const char* filepath) {
+    lstring result = filepath;
+    size_t endDir = result.find_last_of(Directory_files::SLASH);
+    if (endDir != string::npos)
+        result = result.substr(endDir + 1);
+    size_t endName = result.find_last_of(EXTN_CHAR);
+    if (endName != string::npos)
+        result.resize(endName);
+    return result;
+}
+// ---------------------------------------------------------------------------
+lstring getPartExt(const char* filepath) {
+    lstring result = filepath;
+    size_t pos = result.find_last_of(EXTN_CHAR);
+    return result.substr(pos);
+}
+// ---------------------------------------------------------------------------
+lstring parts(const char* filepath, bool dir, bool name, bool ext) {
+    // #include <filesystem>
+    // std::filesystem::path pathParts = filepath;
+
+    lstring result;
+    if (dir) {
+        result += getPartDir(filepath);
+    }
+    if (name) {
+        result += getPartName(filepath);
+    }
+    if (ext) {
+        result += getPartExt(filepath);
+    }
+    return result;
+}
+
 // ---------------------------------------------------------------------------
 void printParts(
     const char* customFmt,
@@ -199,23 +244,23 @@ void printParts(
                 break;
             case 'p':
                 itemFmt += "s";
-                printf(itemFmt, Directory_files::parts(filepath, true, false, false).c_str());
+                printf(itemFmt, parts(filepath, true, false, false).c_str());
                 break;
             case 'r':   // relative path
                 itemFmt += "s";
-                printf(itemFmt, Directory_files::parts(filepath, true, false, false).replaceStr(cwd, "").c_str());
+                printf(itemFmt, parts(filepath, true, false, false).replaceStr(cwd, "").c_str());
                 break;
             case 'n':
                 itemFmt += "s";
-                printf(itemFmt, Directory_files::parts(filepath, false, true, false).c_str());
+                printf(itemFmt, parts(filepath, false, true, false).c_str());
                 break;
             case 'e':
                 itemFmt += "s";
-                printf(itemFmt, Directory_files::parts(filepath, false, false, true).c_str());
+                printf(itemFmt, parts(filepath, false, false, true).c_str());
                 break;
             case 'f':
                 itemFmt += "s";
-                printf(itemFmt, Directory_files::parts(filepath, false, true, true).c_str());
+                printf(itemFmt, parts(filepath, false, true, true).c_str());
                 break;
             case 'o':
                 itemFmt += "lu";    // unsigned long formatter
@@ -427,13 +472,13 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
                 g_regSearchCnt++;
                 if (! backupDir.empty()) {
                     lstring backupFull;
-                    rename(inFilepath, Directory_files::join(backupFull, backupDir, backupToName));
+                    rename(inFilepath, DirUtil::join(backupFull, backupDir, backupToName));
                 }
 
                 ostream* outPtr = &cout;
                 if (outFilepath != "-") {
                     if (canForce)
-                        Directory_files::makeWriteableFile(outFilepath, nullptr);
+                        DirUtil::makeWriteableFile(outFilepath, nullptr);
                     out.open(outFilepath);
                     if (out.is_open()) {
                         outPtr = &out;
@@ -498,7 +543,7 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
 static size_t ReplaceFile(const lstring& inFullname) {
     size_t fileCount = 0;
     lstring name;
-    Directory_files::getName(name, inFullname);
+    DirUtil::getName(name, inFullname);
 
     if (! name.empty()
         && ! FileMatches(name, excludeFilePatList, false)
@@ -726,8 +771,6 @@ int main(int argc, char* argv[]) {
                         } else if (parser.validOption("to", cmdName))  {
                             toPat = value;
                             ParseUtil::convertSpecialChar(toPat);
-                            if (showPattern)
-                                ParseUtil::dumpStr("To", toPat);
                             doReplace = true;
                         }
                         break;

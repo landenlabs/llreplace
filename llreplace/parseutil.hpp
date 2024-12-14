@@ -34,15 +34,9 @@
 
 #include "ll_stdhdr.hpp"
 
-
-#ifdef HAVE_WIN
-#include <windows.h>
-#include <stdio.h>
-#endif
-
-#include <iostream>
 #include <regex>
 #include <set>
+#include <iostream>
 
 typedef std::vector<std::regex> PatternList;
 
@@ -53,28 +47,28 @@ public:
     unsigned optionErrCnt = 0;
     unsigned patternErrCnt = 0;
     std::set<std::string> parseArgSet;
-    
+
+    ParseUtil() noexcept ;
+    // ~ParseUtil();
+
     void showUnknown(const char* argStr);
-    
+
     std::regex getRegEx(const char* value);
+
     bool validOption(const char* validCmd, const char* possibleCmd, bool reportErr = true);
     bool validPattern(PatternList& outList, lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr = true);
  
-    bool validFile(std::fstream& stream, int mode, const lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr = true);
+    bool validFile(fstream& stream, int mode, const lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr = true);
     
-    static 
-    lstring& convertSpecialChar(lstring& inOut);
-
-    static 
-    lstring& getParts(
+    static bool FileMatches(const lstring& inName, const PatternList& patternList, bool emptyResult);
+    static lstring& convertSpecialChar(lstring& inOut);
+    static std::string& fmtDateTime(string& outTmStr, time_t& now);
+    static lstring& getParts(
             lstring& outPart,
             const char* partSelector,
             const char* name,
             const char* ext,
             unsigned num );
-    
-    static 
-    void dumpStr(const char* label, const std::string& str);
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -124,15 +118,20 @@ public:
     }
 };
 
-
 //-------------------------------------------------------------------------------------------------
 // Replace using regular expression
-inline std::string& replaceRE(std::string& inOut, const char* findRE, const char* replaceWith) {
-    std::regex pattern(findRE);
-    std::regex_constants::match_flag_type flags = std::regex_constants::match_default;
-    inOut = std::regex_replace(inOut, pattern, replaceWith, flags);
+inline string& replaceRE(string& inOut, const char* findRE, const char* replaceWith) {
+    regex pattern(findRE);
+    regex_constants::match_flag_type flags = regex_constants::match_default;
+    inOut = regex_replace(inOut, pattern, replaceWith, flags);
     return inOut;
 }
+
+#ifdef HAVE_WIN
+#include <windows.h>
+#include <stdio.h>
+#endif
+
 
 class Colors {
 public:
@@ -196,7 +195,5 @@ public:
 // #endif
         std::cerr << Colors::colorize("_X_\n");
     }
-   
-
 };
 

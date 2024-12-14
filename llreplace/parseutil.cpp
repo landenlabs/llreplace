@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// File: parseutil.hpp
+// File: parseutil.cpp
 // Author: Dennis Lang
 //
 // Desc: Parsing utility functions.
@@ -40,26 +40,55 @@
 #include <regex>
 
 #ifdef HAVE_WIN
-#define strncasecmp _strnicmp
+    #define strncasecmp _strnicmp
+#else
+    #include <signal.h>
 #endif
-
-using namespace std;
 
 typedef unsigned int uint;
 
+volatile bool abortFlag = false;    // Set true by signal handler
+
+
+#ifdef HAVE_WIN
+//-------------------------------------------------------------------------------------------------
+BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
+    switch (fdwCtrlType)  {
+    case CTRL_C_EVENT:  // Handle the CTRL-C signal.
+        Command::abortFlag = true;
+        std::cerr << "\nCaught signal " << std::endl;
+        Beep(750, 300);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+#else
+//-------------------------------------------------------------------------------------------------
+void sigHandler(int /* sig_t */ s) {
+    abortFlag = true;
+    std::cerr << "\nCaught signal " << std::endl;
+}
+#endif
 
 // ---------------------------------------------------------------------------
-// Dump String, showing non-printable has hex value.
-void ParseUtil::dumpStr(const char* label, const std::string& str) {
-    std::cerr << "Pattern " << label << " length=" << str.length() << std::endl;
-    for (int idx = 0; idx < str.length(); idx++) {
-        std::cerr << "  [" << idx << "]";
-        if (isprint(str[idx]))
-            std::cerr << str[idx] << std::endl;
-        else
-            std::cerr << "(hex) " << std::hex << (unsigned)str[idx] << std::dec << std::endl;
+ParseUtil::ParseUtil() noexcept {
+#ifdef HAVE_WIN
+    if (! SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
+        std::cerr << "Failed to install sig handler" << endl;
     }
-    std::cerr << "[end-of-pattern]\n";
+#else
+    // signal(SIGINT, sigHandler);
+
+    struct sigaction sigIntHandler;
+    sigIntHandler.sa_handler = sigHandler;
+    sigemptyset(&sigIntHandler.sa_mask);
+    sigIntHandler.sa_flags = 0;
+    if (sigaction(SIGINT, &sigIntHandler, NULL) != 0) {
+        std::cerr << "Failed to install sig handler" << endl;
+    }
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +103,6 @@ std::regex ParseUtil::getRegEx(const char* value) {
     try {
         lstring valueStr(value);
         convertSpecialChar(valueStr);
-        // dumpStr("From", valueStr);
         return std::regex(valueStr);
         // return std::regex(valueStr, regex_constants::icase);
     } catch (const std::regex_error& regEx) {
@@ -134,6 +162,21 @@ bool ParseUtil::validFile(
         }
     }
     return isOk;
+}
+
+
+// ---------------------------------------------------------------------------
+// Return true if inName matches pattern in patternList
+// [static]
+bool ParseUtil::FileMatches(const lstring& inName, const PatternList& patternList, bool emptyResult) {
+    if (patternList.empty() || inName.empty())
+        return emptyResult;
+
+    for (size_t idx = 0; idx != patternList.size(); idx++)
+        if (std::regex_match(inName.begin(), inName.end(), patternList[idx]))
+            return true;
+
+    return false;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -197,90 +240,22 @@ lstring& ParseUtil::convertSpecialChar(lstring& inOut) {
     return inOut;
 }
 
-// ---------------------------------------------------------------------------
-#include <locale>
-#include <iostream>
-
-template <typename Ch>
-class numfmt: public std::numpunct<Ch> {
-    int group;    // Number of characters in a group
-    Ch  separator; // Character to separate groups
-public:
-    numfmt(Ch sep, int grp): separator(sep), group(grp) {}
-private:
-    Ch do_thousands_sep() const { return separator; }
-    std::string do_grouping() const { return std::string(1, group); }
-};
-
-inline void EnableCommaCout() {
-#if 0
-    char sep = ',';
-    int group = 3;
-    std::cout.imbue(std::locale(std::locale(),
-        new numfmt<char>(sep, group)));
-#else
-    setlocale(LC_ALL, "");
-    std::locale mylocale("");   // Get system locale
-    std::cout.imbue(mylocale);
-#endif
+//-------------------------------------------------------------------------------------------------
+// Get current date/time, format is YYYY-MM-DD.HH:mm:ss
+// [static]
+std::string& ParseUtil::fmtDateTime(string& outTmStr, time_t& now) {
+    now = time(0);
+    struct tm  tstruct;
+    char       buf[80];
+    tstruct = *localtime(&now);
+    // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
+    strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
+    outTmStr = buf;
+    return outTmStr;
 }
-
-inline void DisableCommaCout() {
-    std::cout.imbue(std::locale(std::locale()));
-}
-
-#if defined(__APPLE__) && defined(__MACH__)
-    #include <printf.h>
-    #define PRINTF(a,b) xprintf(_domain, NULL, a,b)
-    static printf_domain_t _domain;
-#else
-    #define PRINTF(a,b) printf(a,b)
-#endif
-
-inline void initPrintf() {
-#if defined(__APPLE__) && defined(__MACH__)
-    _domain = new_printf_domain();
-    setlocale(LC_ALL, "en_US.UTF-8");
-#endif
-}
-
-
-
-#if 0
-// ---------------------------------------------------------------------------
-const char* fmtNumComma(size_t n, char*& buf) {
-    char* result = buf;
-    /*
-     // if n is signed value.
-    if (n < 0) {
-        *buf++ = "-";
-        return printfcomma(-n, buf);
-    }
-    */
-    if (n < 1000) {
-        buf += snprintf((char*)buf, 4, "%lu", (unsigned long)n);
-        return result;
-    }
-    fmtNumComma(n / 1000, buf);
-    buf += snprintf((char*)buf, 5, ",%03lu", (unsigned long) n % 1000);
-    return result;
-}
-
-// Legacy ?windows? way of adding commas
-char buf[40];
-printf("%s", fmtNumComma(value, buf));
-#endif
-
-/*
-#if defined(__APPLE__) && defined(__MACH__)
-#include <printf.h>
-#define PRINTF(a,b) xprintf(domain, NULL, a,b)
-#else
-#define PRINTF(a,b) printf(a,b)
-#endif
-*/
 
 //-------------------------------------------------------------------------------------------------
+// [static]
 lstring& ParseUtil::getParts(
         lstring& outPart,
         const char* partSelector,
@@ -288,13 +263,6 @@ lstring& ParseUtil::getParts(
         const char* ext,        // just extension, no dot prefix
         unsigned num) {
 
-#ifdef HAVE_WIN
-    const char* FMT_NUM = "lu";
-#else
-    const char* FMT_NUM = "'lu";  //  "`lu" linux supports ` to add commas
-    EnableCommaCout();
-#endif
-    
     unsigned width=0;
     char numFmt[10], numStr[10];
     
