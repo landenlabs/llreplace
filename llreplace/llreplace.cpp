@@ -96,6 +96,7 @@ bool isVerbose = false;
 bool doLineByLine = false;      // What is this for ?, should it be a switch
 bool showPattern = false;
 bool inverseMatch = false;
+bool dryRun = false;
 bool canForce = false;          // Can update read-only file.
 bool progress = true;           // Show progress
 uint optionErrCnt = 0;
@@ -422,6 +423,11 @@ unsigned FindLineGrep(const char* filepath) {
                     if (pFilter->valid(off, len)) {
                         if (! inverseMatch) {
                             printParts(printPosFmt, filepath, off, len, lineBuffer.substr(pos, len), lineBuffer.c_str());
+                            if (doReplace) {
+                                string result;
+                                std::regex_replace(std::back_inserter(result), lineBuffer.begin(), lineBuffer.end(), fromPat, toPat, rxFlags);
+                                std::cout << "TO=" << result << std::endl;
+                            }
                         }
                         matchCnt++;
                     }
@@ -548,7 +554,7 @@ static size_t ReplaceFile(const lstring& inFullname) {
     if (! name.empty()
         && ! FileMatches(name, excludeFilePatList, false)
         && FileMatches(name, includeFilePatList, true)) {
-        if (doReplace) {
+        if (doReplace && !dryRun) {
             string outFullname = (outFile.length() != 0) ? outFile : inFullname;
             if (ReplaceFile(inFullname, outFullname, name)) {
                 fileCount++;
@@ -638,6 +644,7 @@ void showHelp(const char* argv0) {
         "   -_y_ExcludePath=<pathPattern>     ; Exclude path by regex match \n"
         "   -_y_range=beg,end                 ; Optional line range filter \n"
         "   -_y_force                         ; Allow updates on read-only files \n"
+        "   -_y_no                            ; Dry run, show changes \n"
         "\n"
         "   directories...                 ; Directories to scan\n"
         "\n"
@@ -801,6 +808,9 @@ int main(int argc, char* argv[]) {
                             break;
                         case 'i':
                             inverseMatch = parser.validOption("inverse", cmdName, true);
+                            break;
+                        case 'n':
+                            doLineByLine = dryRun = parser.validOption("no", cmdName, true);
                             break;
                         case 'v':
                             isVerbose = parser.validOption("verbose", cmdName, true);
