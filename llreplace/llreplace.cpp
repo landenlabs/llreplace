@@ -37,10 +37,11 @@
 
 // Project files
 #include "ll_stdhdr.hpp"
-#include "directory.hpp"
-#include "parseutil.hpp"
-#include "filters.hpp"
 #include "signals.hpp"
+#include "parseutil.hpp"
+#include "directory.hpp"
+#include "filters.hpp"
+
 
 #include <assert.h>
 #include <stdio.h>
