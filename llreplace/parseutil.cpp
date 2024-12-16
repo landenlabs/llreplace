@@ -9,7 +9,7 @@
 // Author: Dennis Lang - 2024
 // https://landenlabs.com
 //
-// This file is part of lldupdir project.
+// This file is part of llreplace project.
 //
 // ----- License ----
 //
@@ -41,55 +41,10 @@
 
 #ifdef HAVE_WIN
     #define strncasecmp _strnicmp
-#else
-    #include <signal.h>
 #endif
 
 typedef unsigned int uint;
 
-volatile bool abortFlag = false;    // Set true by signal handler
-
-
-#ifdef HAVE_WIN
-//-------------------------------------------------------------------------------------------------
-BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
-    switch (fdwCtrlType)  {
-    case CTRL_C_EVENT:  // Handle the CTRL-C signal.
-        abortFlag = true;
-        std::cerr << "\nCaught signal " << std::endl;
-        Beep(750, 300);
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-#else
-//-------------------------------------------------------------------------------------------------
-void sigHandler(int /* sig_t */ s) {
-    abortFlag = true;
-    std::cerr << "\nCaught signal " << std::endl;
-}
-#endif
-
-// ---------------------------------------------------------------------------
-ParseUtil::ParseUtil() noexcept {
-#ifdef HAVE_WIN
-    if (! SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
-        std::cerr << "Failed to install sig handler" << endl;
-    }
-#else
-    // signal(SIGINT, sigHandler);
-
-    struct sigaction sigIntHandler;
-    sigIntHandler.sa_handler = sigHandler;
-    sigemptyset(&sigIntHandler.sa_mask);
-    sigIntHandler.sa_flags = 0;
-    if (sigaction(SIGINT, &sigIntHandler, NULL) != 0) {
-        std::cerr << "Failed to install sig handler" << endl;
-    }
-#endif
-}
 
 // ---------------------------------------------------------------------------
 void ParseUtil::showUnknown(const char* argStr) {

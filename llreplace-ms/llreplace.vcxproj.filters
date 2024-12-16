@@ -24,6 +24,9 @@
     <ClCompile Include="..\llreplace\parseutil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\llreplace\signals.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\llreplace\directory.hpp">
@@ -39,6 +42,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\llreplace\parseutil.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\llreplace\signals.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -40,6 +40,7 @@
 
 typedef std::vector<std::regex> PatternList;
 
+
 //-------------------------------------------------------------------------------------------------
 class ParseUtil {
     
@@ -47,9 +48,6 @@ public:
     unsigned optionErrCnt = 0;
     unsigned patternErrCnt = 0;
     std::set<std::string> parseArgSet;
-
-    ParseUtil() noexcept ;
-    // ~ParseUtil();
 
     void showUnknown(const char* argStr);
 
@@ -183,7 +181,8 @@ public:
         }
     }
 
-    // Show error in RED
+    // Requires C++ v17+
+    // Show error in RED 
     template<typename T, typename... Args>
     static void showError(T first, Args... args) {
         std::cerr << Colors::colorize("_R_");

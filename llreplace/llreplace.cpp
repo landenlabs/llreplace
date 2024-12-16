@@ -40,7 +40,7 @@
 #include "directory.hpp"
 #include "parseutil.hpp"
 #include "filters.hpp"
-
+#include "signals.hpp"
 
 #include <assert.h>
 #include <stdio.h>
@@ -596,7 +596,7 @@ static size_t ReplaceFiles(const lstring& dirname) {
         // Probably a pattern, let directory scan do its magic.
     }
 
-    while (directory.more()) {
+    while (!Signals::aborted && directory.more()) {
         directory.fullName(fullname);
         if (directory.is_directory()) {
             if(! FileMatches(fullname, excludePathPatList, false)
@@ -610,8 +610,6 @@ static size_t ReplaceFiles(const lstring& dirname) {
 
     return fileCount;
 }
-
-
 
 // ---------------------------------------------------------------------------
 template<typename TT>
@@ -681,8 +679,9 @@ void showHelp(const char* argv0) {
 
 // ---------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
+    Signals::init();
     ParseUtil parser;
-    
+
     if (argc == 1) {
         showHelp(argv[0]);
     } else {

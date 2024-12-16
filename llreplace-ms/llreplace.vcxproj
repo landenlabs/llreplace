@@ -132,6 +132,7 @@
     <ClCompile Include="..\llreplace\directory.cpp" />
     <ClCompile Include="..\llreplace\llreplace.cpp" />
     <ClCompile Include="..\llreplace\parseutil.cpp" />
+    <ClCompile Include="..\llreplace\signals.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\llreplace\directory.hpp" />
@@ -139,6 +140,7 @@
     <ClInclude Include="..\llreplace\ll_stdhdr.hpp" />
     <ClInclude Include="..\llreplace\lstring.hpp" />
     <ClInclude Include="..\llreplace\parseutil.hpp" />
+    <ClInclude Include="..\llreplace\signals.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
