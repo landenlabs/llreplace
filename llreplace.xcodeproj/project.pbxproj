@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		9AB237262CF8E430007446E8 /* parseutil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9AB237252CF8E430007446E8 /* parseutil.cpp */; };
+		9AFA96142D11BEEF002F76BA /* signals.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9AFA96132D11BEEF002F76BA /* signals.cpp */; };
 		B9B44DD71D8F661700782398 /* directory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B9B44DCA1D8F661700782398 /* directory.cpp */; };
 		B9B44DD81D8F661700782398 /* llreplace.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B9B44DCE1D8F661700782398 /* llreplace.cpp */; };
 /* End PBXBuildFile section */
@@ -25,9 +26,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		9A1E516F2CFB4DDD00689757 /* llreplace */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = llreplace; sourceTree = BUILT_PRODUCTS_DIR; };
+		9A1E516F2CFB4DDD00689757 /* llreplace */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; name = llreplace; path = "/Users/dennislang/opt/projects/projects-xcode/_ll/llreplace/build/Debug/llreplace"; sourceTree = "<absolute>"; };
 		9AB237242CF8E430007446E8 /* parseutil.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = parseutil.hpp; sourceTree = "<group>"; };
 		9AB237252CF8E430007446E8 /* parseutil.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = parseutil.cpp; sourceTree = "<group>"; };
+		9AFA96122D11BEEF002F76BA /* signals.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = signals.hpp; sourceTree = "<group>"; };
+		9AFA96132D11BEEF002F76BA /* signals.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = signals.cpp; sourceTree = "<group>"; };
 		B9B44DCA1D8F661700782398 /* directory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = directory.cpp; sourceTree = "<group>"; };
 		B9B44DCB1D8F661700782398 /* directory.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = directory.hpp; sourceTree = "<group>"; };
 		B9B44DCE1D8F661700782398 /* llreplace.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = llreplace.cpp; sourceTree = "<group>"; };
@@ -51,13 +54,14 @@
 			isa = PBXGroup;
 			children = (
 				B9B44DBF1D8F65CD00782398 /* llreplace */,
-				9A1E516F2CFB4DDD00689757 /* llreplace */,
 			);
 			sourceTree = "<group>";
 		};
 		B9B44DBF1D8F65CD00782398 /* llreplace */ = {
 			isa = PBXGroup;
 			children = (
+				9AFA96122D11BEEF002F76BA /* signals.hpp */,
+				9AFA96132D11BEEF002F76BA /* signals.cpp */,
 				9AB237242CF8E430007446E8 /* parseutil.hpp */,
 				9AB237252CF8E430007446E8 /* parseutil.cpp */,
 				B9B44DCA1D8F661700782398 /* directory.cpp */,
@@ -129,6 +133,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9AB237262CF8E430007446E8 /* parseutil.cpp in Sources */,
+				9AFA96142D11BEEF002F76BA /* signals.cpp in Sources */,
 				B9B44DD81D8F661700782398 /* llreplace.cpp in Sources */,
 				B9B44DD71D8F661700782398 /* directory.cpp in Sources */,
 			);
