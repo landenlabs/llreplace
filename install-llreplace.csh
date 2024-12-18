@@ -8,7 +8,7 @@ set app=llreplace
 # xcodebuild -derivedDataPath ./DerivedData/lldupdir -scheme $app -configuration Release clean build
 xcodebuild -scheme $app -configuration Release clean build
 
-# echo -----------------------
+# echo -------------------
 # find ./DerivedData -type f -name $app -perm +111 -ls
 set src=./DerivedData/$app/Build/Products/Release/$app
 set src=./DerivedData/Build/Products/Release/$app
@@ -20,3 +20,7 @@ cp $src ~/opt/bin/
 echo
 echo "---Files "
 ls -al $src  ~/opt/bin/$app
+
+echo
+echo "---Signed---"
+codesign -dv  ~/opt/bin/$app |& grep Sig
