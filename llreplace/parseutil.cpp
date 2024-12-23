@@ -58,8 +58,7 @@ std::regex ParseUtil::getRegEx(const char* value) {
     try {
         lstring valueStr(value);
         convertSpecialChar(valueStr);
-        return std::regex(valueStr);
-        // return std::regex(valueStr, regex_constants::icase);
+        return ignoreCase ? std::regex(valueStr, regex_constants::icase) : std::regex(valueStr);
     } catch (const std::regex_error& regEx) {
         Colors::showError("Invalid regular expression ", regEx.what(), ", Pattern=", value);
     }

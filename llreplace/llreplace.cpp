@@ -210,16 +210,13 @@ void printParts(
     const char* filepath,
     size_t fileOffset,
     size_t matchLen,
-    const lstring& matchStr,
+    const char* matchPtr, 
     const char* begLinePtr) {
-    // TODO - handle custom printf syntax to get to path parts:
-    //    %#.#s    s=fullpath,  p=path only, n=name only, e=extension only f=filename name+ext
-    //    %0#d     o=offset,  l=length
-    // printf(filepath, fileOffset, len, filepath);
 
     const int NONE = 12345;
     lstring itemFmt;
-    size_t tmpLen;
+    size_t lineLen;
+    char c;
 
     char* fmt = (char*)customFmt;
     while (*fmt) {
@@ -238,6 +235,20 @@ void printParts(
 
             itemFmt = begFmt;
             itemFmt.resize(fmt - begFmt);
+
+            // Default:  "%r/%f(%o) %l\n";
+            // The %X  can be %<width>.<maxWidth>X  as in %20.20s 
+            //  %s=entire file path
+            //  %p=just directory path
+            //  %r=relative directory path
+            //  %n=filename only (no extension)
+            //  %e=extension
+            //  %f=filename with extension
+            //  %o=offset into file where match found
+            //  %z=match length
+            //  %m=matched string
+            //  %l=matched line
+            //  %t=TO_REPLACEMENT  
 
             switch (c) {
             case 's':
@@ -274,21 +285,36 @@ void printParts(
                 break;
             case 'm':
                 itemFmt += "s";
-                printf(itemFmt, matchStr.c_str());
+                c = matchPtr[matchLen];
+                ((char*)matchPtr)[matchLen] = '\0';
+                printf(itemFmt, matchPtr);
+                ( (char*)matchPtr )[matchLen] = c;
                 break;
             case 'l':
-                tmpLen = strcspn(begLinePtr, EOL_STR);
+                lineLen = strcspn(begLinePtr, EOL_STR);
+
+#define COLORIZE 1
+#if COLORIZE
+                printf("%.*s", matchPtr-begLinePtr, begLinePtr);
+                std::cerr << Colors::colorize("_Y_");
+                printf("%.*s", matchLen, matchPtr);
+                std::cerr << Colors::colorize("_X_");
+                printf("%.*s", lineLen - matchLen - ( matchPtr - begLinePtr ), matchPtr+matchLen);
+#else
                 itemFmt += "s";
-                printf(itemFmt, lstring(begLinePtr, tmpLen).c_str());
+                printf(itemFmt, lstring(begLinePtr, lineLen).c_str());
+#endif
                 break;
+                /* 
             case 't':   // match convert using printPat
                 itemFmt += "s";
                 if (printPat.length() == 0) {
                     printf("Missing -printPat=pattern");
                 } else {
-                    printf(itemFmt, std::regex_replace(matchStr, fromPat, printPat, rxFlags).c_str());
+                    printf(itemFmt, std::regex_replace(matchPtr, fromPat, printPat, rxFlags).c_str());
                 }
                 break;
+                */
             default:
                 putchar(c);
                 break;
@@ -334,9 +360,9 @@ unsigned FindFileGrep(const char* filepath) {
                 return 0;
             }
             try {
-                buffer.resize(filestat.st_size);
+                buffer.resize(filestat.st_size+1);
                 buffer[0] = EOL_CHR;
-                streamsize inCnt = in.read(buffer.data() + 1, buffer.size()).gcount();
+                streamsize inCnt = in.read(buffer.data() + 1, buffer.size()-1).gcount();
                 in.close();
                 
                 std::match_results <const char*> match;
@@ -345,6 +371,8 @@ unsigned FindFileGrep(const char* filepath) {
                 size_t off = 0;
                 pFilter->init(buffer);
                 
+                // TODO - detect and ignore binary files 
+
                 fileProgress(filepath);   // g_fileCnt++;
                 while (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)) {
                     g_regSearchCnt++;
@@ -361,7 +389,14 @@ unsigned FindFileGrep(const char* filepath) {
                     
                     if (pFilter->valid(off, len)) {
                         if (! inverseMatch) {
-                            printParts(printPosFmt, filepath, off, len, lstring(begPtr + pos, len), strchrRev(begPtr + pos, EOL_CHR) +1);
+                            if (false) { 
+                                // TODO - colorize output 
+                                const char* matBeg = match[0].first;
+                                const char* matEnd = match[0].second;
+                            }
+
+                            // printParts(printPosFmt, filepath, off, len, lstring(begPtr + pos, len), strchrRev(begPtr + pos, EOL_CHR) +1);
+                            printParts(printPosFmt, filepath, off, len, begPtr + pos, strchrRev(begPtr + pos, EOL_CHR) +1);
                         }
                         matchCnt++;
                     }
@@ -423,7 +458,8 @@ unsigned FindLineGrep(const char* filepath) {
 
                     if (pFilter->valid(off, len)) {
                         if (! inverseMatch) {
-                            printParts(printPosFmt, filepath, off, len, lineBuffer.substr(pos, len), lineBuffer.c_str());
+                            // printParts(printPosFmt, filepath, off, len, lineBuffer.substr(pos, len), lineBuffer.c_str());
+                            printParts(printPosFmt, filepath, off, len, lineBuffer.c_str()+pos, lineBuffer.c_str());
                             if (doReplace) {
                                 string result;
                                 std::regex_replace(std::back_inserter(result), lineBuffer.begin(), lineBuffer.end(), fromPat, toPat, rxFlags);
@@ -625,7 +661,7 @@ std::string stringer(const TT& value, const Args& ... args) {
 // ---------------------------------------------------------------------------
 void showHelp(const char* argv0) {
     const char* helpMsg =
-        "  Dennis Lang v2.2 (LandenLabs.com) " __DATE__  "\n"
+        "  Dennis Lang v2.3 (LandenLabs.com) " __DATE__  "\n"
         "\nDes: Replace text in files\n"
         "Use: llreplace [options] directories...\n"
         "\n"
@@ -642,6 +678,7 @@ void showHelp(const char* argv0) {
         "   -_y_IncludePath=<pathPattern>     ; Include path by regex match \n"
         "   -_y_ExcludePath=<pathPattern>     ; Exclude path by regex match \n"
         "   -_y_range=beg,end                 ; Optional line range filter \n"
+        "   -_y_ignoreCase                    ; Next pattern set to ignore case \n"
         "   -_y_force                         ; Allow updates on read-only files \n"
         "   -_y_no                            ; Dry run, show changes \n"
         "\n"
@@ -649,11 +686,23 @@ void showHelp(const char* argv0) {
         "\n"
         "_P_Other options:_X_\n"
         "   -_y_inverse                       ; Invert Search, show files not matching \n"
-        "   -_y_printFmt=' %r/%f(%o) %l\\n'       ; Printf format to present match \n"
+        "   -_y_printFmt=' %r/%f(%o) %l\\n'    ; Printf format to present match \n"
         "  %s=fullpath, %p=path, %r=relative path, %f=filename, %n=name only %e=extension \n"
         "  %o=character offset, %z=match length %m=match string %t=match convert using toPattern \n"
         "  %l match line \n"
         "\n"
+        "_P_PrintFmt:_X_ \n"
+        "  Default:  \"%r / %f(%o) %l\n\" \n"
+        "       s = entire file path \n"
+        "       p = just directory path \n"
+        "       r = relative directory path \n"
+        "       n = filename only (no extension) \n"
+        "       e = extension \n"
+        "       f = filename with extension \n"
+        "       o = offset into file where match found \n"
+        "       z = match length \n"
+        "       m = matched string \n"
+        "       l = matched line \n"
         "  ex: -_y_printFmt='%20.20f %08o\\n'  \n"
         "  Filename padded to 20 characters, max 20, and offset 8 digits leading zeros.\n"
         "\n"
@@ -807,7 +856,10 @@ int main(int argc, char* argv[]) {
                             canForce = parser.validOption("force", cmdName, true);
                             break;
                         case 'i':
-                            inverseMatch = parser.validOption("inverse", cmdName, true);
+                            if (parser.validOption("ignoreCase", cmdName, false)) {
+                                parser.ignoreCase = true;
+                            } else 
+                                inverseMatch = parser.validOption("inverse", cmdName, true);
                             break;
                         case 'n':
                             doLineByLine = dryRun = parser.validOption("no", cmdName, true);
