@@ -53,16 +53,16 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "-from=&quot;http://landen&quot;"
-            isEnabled = "NO">
+            argument = "-from=&quot;landenlabs&quot;"
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/dennislang/opt/projects/projects-xcode/_ll"
-            isEnabled = "NO">
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/dennislang/opt/projects/projects-android/_all/all-ThreadPenalty/threadPenalty/.cxx/Debug/4b3d713p/x86/.cmake/api/v1/query/client-agp/cache-v2"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>

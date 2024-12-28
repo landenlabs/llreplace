@@ -41,7 +41,7 @@
 #include "parseutil.hpp"
 #include "directory.hpp"
 #include "filters.hpp"
-
+#include "threader.hpp" // Defines CAN_THREAD
 
 #include <assert.h>
 #include <stdio.h>
@@ -100,17 +100,24 @@ bool inverseMatch = false;
 bool dryRun = false;
 bool canForce = false;          // Can update read-only file.
 bool progress = true;           // Show progress
+bool doReplace = false;
+bool runWithThreads = false;
+bool binaryOkay = false;
+// bool recurse = true;
+
 uint optionErrCnt = 0;
 uint patternErrCnt = 0;
-const char EOL_CHR = '\n';
-const char* EOL_STR = "\n";
-
 lstring printPosFmt = "%r/%f(%o) %l\n";
 lstring cwd;    // current working directory
 
-// Working values
-bool doReplace = false;
-std::vector<char> buffer;
+const char EXTN_CHAR = '.';
+const char EOL_CHR = '\n';
+const char* EOL_STR = "\n";
+const size_t KB = 1024;
+const size_t MB = KB * KB;
+const size_t GB = MB * KB;
+const size_t MAX_FILE_SIZE_DEF = MB * 200;
+size_t maxFileSize = MAX_FILE_SIZE_DEF;
 
 #if 0
     // Sample replace fragment.
@@ -143,6 +150,7 @@ Filter* pFilter = &nopFilter;
 
 unsigned long g_regSearchCnt = 0;
 unsigned long g_fileCnt = 0;
+unsigned long g_binaryCnt = 0;
 
 
 
@@ -158,9 +166,6 @@ bool FileMatches(const lstring& inName, const PatternList& patternList, bool emp
 
     return false;
 }
-
-
-const char EXTN_CHAR = '.';
 // ---------------------------------------------------------------------------
 lstring getPartDir(const char* filepath) {
     lstring result = filepath;
@@ -216,7 +221,7 @@ void printParts(
     const int NONE = 12345;
     lstring itemFmt;
     size_t lineLen;
-    char c;
+    // char c;
 
     char* fmt = (char*)customFmt;
     while (*fmt) {
@@ -295,11 +300,11 @@ void printParts(
 
 #define COLORIZE 1
 #if COLORIZE
-                printf("%.*s", matchPtr-begLinePtr, begLinePtr);
+                printf("%.*s", (int)(matchPtr-begLinePtr), begLinePtr);
                 std::cerr << Colors::colorize("_Y_");
-                printf("%.*s", matchLen, matchPtr);
+                printf("%.*s", (int)matchLen, matchPtr);
                 std::cerr << Colors::colorize("_X_");
-                printf("%.*s", lineLen - matchLen - ( matchPtr - begLinePtr ), matchPtr+matchLen);
+                printf("%.*s", int(lineLen - matchLen - ( matchPtr - begLinePtr )), matchPtr+matchLen);
 #else
                 itemFmt += "s";
                 printf(itemFmt, lstring(begLinePtr, lineLen).c_str());
@@ -340,6 +345,34 @@ void fileProgress(const char* filePath) {
 }
 
 // ---------------------------------------------------------------------------
+bool isBinary(Buffer& buffer, struct stat& filestat, const char* fullname) {
+    if (binaryOkay)
+        return false;
+    
+    bool isBinary = false;  // filestat.st_mode & S_IXUSR
+    if (buffer.size() > KB) {
+        size_t goodCnt;
+        unsigned char* cPtr = (unsigned char*)buffer.data();
+        unsigned char* endPtr = cPtr + KB;
+        while (cPtr < endPtr) {
+            unsigned char c = *cPtr++;
+            if (c >= 32 && c < 128)
+                goodCnt++;
+        }
+        isBinary = goodCnt < (KB/2);
+    }
+    if (isBinary) {
+        g_binaryCnt++;
+        if (isVerbose)
+            std::cerr << "Skipping binary " << fullname << std::endl;
+    }
+    return isBinary;
+}
+
+// Forward declaration
+unsigned FindLineGrep(const char* filepath);
+
+// ---------------------------------------------------------------------------
 // Find 'fromPat' in file
 unsigned FindFileGrep(const char* filepath) {
     lstring         filename;
@@ -347,31 +380,37 @@ unsigned FindFileGrep(const char* filepath) {
     ofstream        out;
     struct stat     filestat;
     uint            matchCnt = 0;
-    const uint      MAX_FILE_SIZE = 1024 * 1024 * 20;
+
 
     try {
         if (stat(filepath, &filestat) != 0)
             return 0;
-
+        
+        if (filestat.st_size > maxFileSize) {
+            Colors::showError("File too large ", filepath, " ", filestat.st_size);
+            return 0;
+            // return FindLineGrep(filepath);
+        }
+        
         in.open(filepath);
         if (in.good() && filestat.st_size > 0 && S_ISREG(filestat.st_mode)) {
-            if (filestat.st_size > MAX_FILE_SIZE) {
-                Colors::showError("File too large ", filepath, " ", filestat.st_size);
-                return 0;
-            }
+
             try {
-                buffer.resize(filestat.st_size+1);
+                Buffer buffer(filestat.st_size+1);
                 buffer[0] = EOL_CHR;
                 streamsize inCnt = in.read(buffer.data() + 1, buffer.size()-1).gcount();
                 in.close();
                 
+                if (isBinary(buffer, filestat, filepath))
+                    return 0;
+                    
                 std::match_results <const char*> match;
                 const char* begPtr = (const char*)buffer.data() + 1;
                 const char* endPtr = begPtr + inCnt;
                 size_t off = 0;
-                pFilter->init(buffer);
+                pFilter->init(buffer.data());
                 
-                // TODO - detect and ignore binary files 
+    // TODO - detect and ignore binary files
 
                 fileProgress(filepath);   // g_fileCnt++;
                 while (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)) {
@@ -389,12 +428,6 @@ unsigned FindFileGrep(const char* filepath) {
                     
                     if (pFilter->valid(off, len)) {
                         if (! inverseMatch) {
-                            if (false) { 
-                                // TODO - colorize output 
-                                const char* matBeg = match[0].first;
-                                const char* matEnd = match[0].second;
-                            }
-
                             // printParts(printPosFmt, filepath, off, len, lstring(begPtr + pos, len), strchrRev(begPtr + pos, EOL_CHR) +1);
                             printParts(printPosFmt, filepath, off, len, begPtr + pos, strchrRev(begPtr + pos, EOL_CHR) +1);
                         }
@@ -414,7 +447,7 @@ unsigned FindFileGrep(const char* filepath) {
     } catch (exception ex) {
         Colors::showError(ex.what(), " Parsing error in file:",  filepath);
     }
-    return 0;
+    return (matchCnt > 0) ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -435,10 +468,10 @@ unsigned FindLineGrep(const char* filepath) {
         if (in.good() && filestat.st_size > 0 && S_ISREG(filestat.st_mode)) {
             // std::match_results <std::string> match;
             std::smatch match;
-
             size_t off = 0;
 
-            pFilter->init(buffer);
+            Buffer buffer(512);
+            pFilter->init(buffer.data());
             std::string lineBuffer;
 
             fileProgress(filepath);   // g_fileCnt++;
@@ -489,25 +522,33 @@ unsigned FindLineGrep(const char* filepath) {
 bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const lstring& backupToName) {
     ifstream        in;
     ofstream        out;
-
     struct stat     filestat;
 
     try {
         if (stat(inFilepath, &filestat) != 0)
             return false;
-
+        
+        if (filestat.st_size > maxFileSize) {
+            Colors::showError("File too large ", inFilepath, " ", filestat.st_size);
+            return 0;
+        }
+        
         in.open(inFilepath);
         if (in.good() && filestat.st_size > 0 && S_ISREG(filestat.st_mode)) {
             fileProgress(inFilepath);   // g_fileCnt++;
-            buffer.resize(filestat.st_size);
+            Buffer buffer(filestat.st_size+1);
+            // buffer.resize(filestat.st_size);
             streamsize inCnt = in.read(buffer.data(), buffer.size()).gcount();
             in.close();
 
+            if (isBinary(buffer, filestat, inFilepath))
+                return 0;
+            
             std::match_results <const char*> match;
             std::match_results <const char*> matchEnd;
             const char* begPtr = (const char*)buffer.data();
             const char* endPtr = begPtr + inCnt;
-            pFilter->init(buffer);
+            pFilter->init(buffer.data());
 
             // WARNING - LineFilter only validates first match and not multiple replacements.
             if (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)
@@ -618,6 +659,57 @@ static size_t ReplaceFile(const lstring& inFullname) {
 }
 
 // ---------------------------------------------------------------------------
+// Optional thread support
+
+#ifdef CAN_THREAD
+class ReplaceJob : public Job {
+public:
+    lstring fullname;
+    static std::atomic<size_t> result;
+    
+    ReplaceJob(const lstring& _fullname) : fullname(_fullname) {
+    }
+    ~ReplaceJob() { }
+    virtual void run() {
+        result += ReplaceFile(fullname);
+    }
+    virtual void dump() {
+        std::cerr << fullname << std::endl;
+    }
+};
+std::atomic<size_t> ReplaceJob::result = 0;
+#endif
+
+
+
+static size_t ThreadReplaceFile(const lstring& inFullname) {
+#ifdef CAN_THREAD
+    if (runWithThreads) {
+        Threader::runIt(new ReplaceJob(inFullname));
+        return 0;
+    }
+#endif
+    return ReplaceFile(inFullname);
+}
+static void ReplaceFilesInit() {
+#ifdef CAN_THREAD
+    if (runWithThreads) {
+        std::cerr << "Running with " << Threader::maxThreads << " threads\n";
+        Threader::init();
+    }
+#endif
+}
+static size_t ReplaceFilesDone() {
+#ifdef CAN_THREAD
+    if (runWithThreads) {
+        Threader::waitForAll();
+        return ReplaceJob::result;
+    }
+#endif
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
 static size_t ReplaceFiles(const lstring& dirname) {
     Directory_files directory(dirname);
     lstring fullname;
@@ -627,7 +719,7 @@ static size_t ReplaceFiles(const lstring& dirname) {
     struct stat filestat;
     try {
         if (stat(dirname, &filestat) == 0 && S_ISREG(filestat.st_mode)) {
-            fileCount += ReplaceFile(dirname);
+            fileCount += ThreadReplaceFile(dirname);
         }
     } catch (exception ex) {
         // Probably a pattern, let directory scan do its magic.
@@ -641,7 +733,7 @@ static size_t ReplaceFiles(const lstring& dirname) {
             fileCount += ReplaceFiles(fullname);
            }
         } else if (fullname.length() > 0) {
-            fileCount += ReplaceFile(fullname);
+            fileCount += ThreadReplaceFile(fullname);
         }
     }
 
@@ -661,7 +753,7 @@ std::string stringer(const TT& value, const Args& ... args) {
 // ---------------------------------------------------------------------------
 void showHelp(const char* argv0) {
     const char* helpMsg =
-        "  Dennis Lang v2.4 (LandenLabs.com) " __DATE__  "\n"
+        "  Dennis Lang v2.5 (LandenLabs.com) " __DATE__  "\n"
         "\nDes: Replace text in files\n"
         "Use: llreplace [options] directories...\n"
         "\n"
@@ -687,6 +779,12 @@ void showHelp(const char* argv0) {
         "   -_y_force                         ; Allow updates on read-only files \n"
         "   -_y_no                            ; Dry run, show changes if replacing \n"
         "   -_y_inverse                       ; Invert Search, show files not matching \n"
+        "   -_y_maxFileSize=<#MB>             ; Max file size MB, def= 200 \n"
+        "   -_y_binary                        ; Include binary files \n"
+#ifdef CAN_THREAD
+        "   -_y_threads                       ; Search/Replace using 20 threads \n"
+        "   -_y_threads=<#threads>            ; Search/Replace using threads \n"
+#endif
         "\n"
         "_P_PrintFmt:_X_ \n"
         "   -_y_printFmt=' %r/%f(%o) %l\\n'    ; Printf format to present match \n"
@@ -792,6 +890,13 @@ int main(int argc, char* argv[]) {
                     case 'I':   // IncludePath=<pat>
                         parser.validPattern(includePathPatList, value, "IncludePath", cmdName);
                         break;
+                        case 'm':
+                            if (parser.validOption("maxFileSizeMB", cmdName))  {
+                                maxFileSize = atoi(value) * MB;
+                                maxFileSize = std::max((size_t)512, std::min(maxFileSize, GB*32));
+                                std::cerr << "MaxFileSizeMB=" << maxFileSize/MB << std::endl;
+                            }
+                            break;
                     case 'r':   // range=beg,end
                         if (parser.validOption("range", cmdName))  {
                             char* nPtr;
@@ -826,10 +931,15 @@ int main(int argc, char* argv[]) {
                             tillPat = parser.getRegEx(value);
                             findMode = FROM_TILL;
                             doLineByLine = true;
-                        } else if (parser.validOption("to", cmdName))  {
+                        } else if (parser.validOption("to", cmdName, false))  {
                             toPat = value;
                             ParseUtil::convertSpecialChar(toPat);
                             doReplace = true;
+#ifdef CAN_THREAD
+                        } else if (parser.validOption("threads", cmdName))  {
+                            runWithThreads = true;
+                            Threader::maxThreads = (ThreadCnt)atoi(value);
+#endif
                         }
                         break;
 
@@ -854,20 +964,28 @@ int main(int argc, char* argv[]) {
                         if (argStr.length() > 2 && *cmdName == '-')
                             cmdName++;  // allow -- prefix on commands
                         switch (*cmdName) {
+                        case 'b':
+                            binaryOkay = parser.validOption("binary", cmdName);
+                            break;
                         case 'f':
-                            canForce = parser.validOption("force", cmdName, true);
+                            canForce = parser.validOption("force", cmdName);
                             break;
                         case 'i':
                             if (parser.validOption("ignoreCase", cmdName, false)) {
                                 parser.ignoreCase = true;
                             } else 
-                                inverseMatch = parser.validOption("inverse", cmdName, true);
+                                inverseMatch = parser.validOption("inverse", cmdName);
                             break;
                         case 'n':
-                            doLineByLine = dryRun = parser.validOption("no", cmdName, true);
+                            doLineByLine = dryRun = parser.validOption("no", cmdName);
                             break;
+#ifdef CAN_THREAD
+                        case 't':
+                            runWithThreads = parser.validOption("threads", cmdName);
+                            break;
+#endif
                         case 'v':
-                            isVerbose = parser.validOption("verbose", cmdName, true);
+                            isVerbose = parser.validOption("verbose", cmdName);
                             break;
                         default:
                             parser.showUnknown(argStr);
@@ -889,7 +1007,8 @@ int main(int argc, char* argv[]) {
         if (patternErrCnt == 0 && optionErrCnt == 0 && fileDirList.size() != 0) {
             // Get starting timepoint
             auto start = std::chrono::high_resolution_clock::now();
-
+            ReplaceFilesInit();
+            
             char cwdTmp[256];
             cwd = getcwd(cwdTmp, sizeof(cwdTmp));
             cwd += Directory_files::SLASH;
@@ -913,6 +1032,8 @@ int main(int argc, char* argv[]) {
                 }
             }
 
+            fileMatchCnt += ReplaceFilesDone();
+            
             // Get ending timepoint
             auto stop = std::chrono::high_resolution_clock::now();
             auto minutes = std::chrono::duration_cast<std::chrono::minutes>(stop - start);
@@ -927,10 +1048,11 @@ int main(int argc, char* argv[]) {
             } else {
                 std::cerr << "Elapsed " << milli.count() << " milliSeconds" << endl;
             }
-            std::cerr << "FilesChecked=" << g_fileCnt << endl;
-            std::cerr << "FilesMatched=" << fileMatchCnt << endl;
+            std::cerr << "FilesChecked= " << g_fileCnt << endl;
+            std::cerr << "BinarySkipped=" << g_binaryCnt << endl;
+            std::cerr << "FilesMatched= " << fileMatchCnt << endl;
             if (toPat.empty() || doLineByLine) {
-                std::cerr << "LinesMatched=" <<  g_regSearchCnt << endl;
+                std::cerr << "LinesMatched= " <<  g_regSearchCnt << endl;
             }
 
         } else {

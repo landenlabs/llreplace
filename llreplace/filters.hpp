@@ -36,7 +36,7 @@
 class Filter {
 public:
     virtual
-    void init(std::vector<char>& buffer) {
+    void init(const char* pBuffer) {
     }
 
     virtual
@@ -58,15 +58,15 @@ struct Zone {
 // ---------------------------------------------------------------------------
 class BufferFilter : public Filter {
 public:
-    const std::vector<char>* pBuffer;
+    const char* pBuffer;
     std::vector<Zone> zones;
     size_t lastPos = 0;
     size_t lineCnt = 0;
     char eol = '\n';
 
     virtual
-    void init(std::vector<char>& buffer) {
-        pBuffer = &buffer;
+    void init(const char* _pBuffer) {
+        pBuffer = _pBuffer;
         lastPos = lineCnt = 0;
     }
 
@@ -77,7 +77,7 @@ public:
     }
 
     void countTo(size_t pos) {
-        const char* cPtr = pBuffer->data() + lastPos;
+        const char* cPtr = pBuffer + lastPos;
         pos -= lastPos;
         const char* endPtr = cPtr + pos;
         while (cPtr < endPtr) {
@@ -110,7 +110,7 @@ public:
     char eol = '\n';
 
     virtual
-    void init(std::vector<char>& buffer) {
+    void init(const char* _pBuffer) {
         lineCnt = 0;
     }
 
