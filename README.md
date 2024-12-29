@@ -63,7 +63,7 @@ PrintFmt:
 
 NOTES:
    . (dot) does not match \r \n,  you need to use [\r\n] or  (.|\r|\n)*
-   Use lookahead for negative condition with dot, ex: "(?!</section)."  Full patter below
+   Use lookahead for negative condition with dot, ex: "(?!&lt;/section)."  Full patter below
    Use single quotes to wrap from and/or to patterns if they use special characters
    like $ dollar sign to prevent shell from interception it.
 
@@ -72,7 +72,7 @@ Examples
   llreplace -from='Copyright' '-include=*.java' -print='%r/%f\n' src1 src2
   llreplace -from='Copyright' '-include=*.java' -include='*.xml' -print='%s' -inverse src res
   llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\r\n ]*Log[.](d|e)([(][^)]*[)];)[\r\n ]*[}]'  '-include=*.java' -range=0,10 -range=20,-1 -printFmt='%f %03d: ' src1 src2
-  llreplace -printFmt="%m\n" -from="<section id='trail-stats'>((?!</section).|\r|\n)*</section>"
+  llreplace -printFmt="%m\n" -from="<section id='trail-stats'>((?!&lt;/section).|\r|\n)*</section>"
 
  Search and replace in-place:
   llreplace '-from=if [(]MapConfigInfo.DEBUG[)] [{][\r\n ]*Log[.](d|e)([(][^)]*[)];)[\r\n ]*[}]' '-to=MapConfigInfo.$1$2$3' '-include=*.java' src

@@ -143,6 +143,10 @@
     <ClInclude Include="..\llreplace\parseutil.hpp" />
     <ClInclude Include="..\llreplace\signals.hpp" />
     <ClInclude Include="..\llreplace\threader.hpp" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="llreplace.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
