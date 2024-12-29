@@ -27,6 +27,9 @@
     <ClCompile Include="..\llreplace\signals.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\llreplace\threader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\llreplace\directory.hpp">
@@ -45,6 +48,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\llreplace\signals.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\llreplace\threader.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

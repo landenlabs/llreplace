@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------------------------
 //
-// File: threader.cpp   Author: Dennis Lang  Desc: run grep/replace in thread
+// File: threader.cpp   Author: Dennis Lang  Desc: run job in thread pool with memory pool.
 //
 //-------------------------------------------------------------------------------------------------
 //
@@ -38,6 +38,7 @@
 #include <semaphore>
 #include <atomic>
 #include <list>
+#include <vector>
 #include <iostream>
 
 
@@ -133,7 +134,7 @@ void clearDoneJobs(Job* jobPtr) {
 }
 
 // -----------------------------------------------------------------------------------
-// Buffer pool manager
+// Memory buffer pool manager
 // -----------------------------------------------------------------------------------
 #ifdef CAN_THREAD
 typedef unsigned int uint;

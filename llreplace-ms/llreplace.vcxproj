@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -119,7 +119,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,6 +133,7 @@
     <ClCompile Include="..\llreplace\llreplace.cpp" />
     <ClCompile Include="..\llreplace\parseutil.cpp" />
     <ClCompile Include="..\llreplace\signals.cpp" />
+    <ClCompile Include="..\llreplace\threader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\llreplace\directory.hpp" />
@@ -141,6 +142,7 @@
     <ClInclude Include="..\llreplace\lstring.hpp" />
     <ClInclude Include="..\llreplace\parseutil.hpp" />
     <ClInclude Include="..\llreplace\signals.hpp" />
+    <ClInclude Include="..\llreplace\threader.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

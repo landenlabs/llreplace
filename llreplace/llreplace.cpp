@@ -44,17 +44,17 @@
 #include "threader.hpp" // Defines CAN_THREAD
 
 #include <assert.h>
-#include <stdio.h>
-#include <ctype.h>
+// #include <stdio.h>
+// #include <ctype.h>
 #include <fstream>
 #include <iostream>
-#include <iomanip>
-#include <stdlib.h>     // stroul
+// #include <iomanip>
+// #include <stdlib.h>     // stroul
 
 #include <vector>
-#include <map>
-#include <set>
-#include <algorithm>
+// #include <map>
+// #include <set>
+// #include <algorithm>
 #include <regex>
 #include <exception>
 #include <chrono>   // Timing program execution
@@ -351,7 +351,7 @@ bool isBinary(Buffer& buffer, struct stat& filestat, const char* fullname) {
     
     bool isBinary = false;  // filestat.st_mode & S_IXUSR
     if (buffer.size() > KB) {
-        size_t goodCnt;
+        size_t goodCnt = 0;
         unsigned char* cPtr = (unsigned char*)buffer.data();
         unsigned char* endPtr = cPtr + KB;
         while (cPtr < endPtr) {
@@ -410,7 +410,7 @@ unsigned FindFileGrep(const char* filepath) {
                 size_t off = 0;
                 pFilter->init(buffer.data());
                 
-    // TODO - detect and ignore binary files
+
 
                 fileProgress(filepath);   // g_fileCnt++;
                 while (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)) {
