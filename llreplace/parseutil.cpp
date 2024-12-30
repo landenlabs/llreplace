@@ -172,7 +172,7 @@ lstring& ParseUtil::convertSpecialChar(lstring& inOut) {
                     *outPtr++ = (char)x;
                     break;
                 }
-                // seep through
+            // seep through
             default:
                 Colors::showError("Warning: unrecognized escape sequence:", inPtr);
                 throw( "Warning: unrecognized escape sequence" );
