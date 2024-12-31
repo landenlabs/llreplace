@@ -1,14 +1,18 @@
 @echo off
 
 set prog=llreplace
-set devenv=F:\opt\VisualStudio\2022\Preview\Common7\IDE\devenv.exe 
 
-echo "msbuild=%msbuild%"
+set dstdir=%bindir%
+if not exist "%dstdir" (
+ if exist c:\opt\bin  set dstdir=c:\opt\bin
+ if exist d:\opt\bin  set dstdir=d:\opt\bin
+)
+
+
 if not exist "%msbuild%" (
 echo Fall back msbuild not found at "%msbuild%"
 set msbuild=F:\opt\VisualStudio\2022\Preview\MSBuild\Current\Bin\MSBuild.exe
 )
-echo "Msbuild=%msbuild%"
 
 cd %prog%-ms
 
@@ -17,8 +21,6 @@ rmdir /s x64 2> nul
 
 @echo.
 @echo Build release target
-@rem %devenv%  %prog%.sln /Build  "Release|x64"
-echo "%msbuild%" %prog%.sln -p:Configuration="Release";Platform=x64 -verbosity:minimal  -detailedSummary:True
 "%msbuild%" %prog%.sln -p:Configuration="Release";Platform=x64 -verbosity:minimal  -detailedSummary:True 
 cd ..
 
@@ -29,13 +31,13 @@ if not exist "%prog%-ms\x64\Release\%prog%.exe" (
    goto _end
 )
 @echo.
-@echo Copy Release to d:\opt\bin
-dir %prog%-ms\x64\Release\%prog%.exe
-copy %prog%-ms\x64\Release\%prog%.exe d:\opt\bin\%prog%.exe
+@echo Copy Release to %dstdir%
+:: dir %prog%-ms\x64\Release\%prog%.exe
+copy %prog%-ms\x64\Release\%prog%.exe %dstdir%\%prog%.exe
 
 @echo.
 @echo Compare md5 hash
-cmp -h %prog%-ms\x64\Release\%prog%.exe d:\opt\bin\%prog%.exe
-ld -a -ph %prog%-ms\x64\Release\%prog%.exe d:\opt\bin\%prog%.exe
+:: cmp -h %prog%-ms\x64\Release\%prog%.exe %dstdir%\%prog%.exe
+ld -a -ph %prog%-ms\x64\Release\%prog%.exe %dstdir%\%prog%.exe
 
 :_end
