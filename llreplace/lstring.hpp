@@ -106,7 +106,6 @@ public:
         transform(begin(), end(), begin(),::toupper);
         return *this;
     }
-
 };
 
 

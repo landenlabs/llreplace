@@ -20,12 +20,6 @@
 //              ...
 //          }
 //-------------------------------------------------------------------------------------------------
-//
-// Author: Dennis Lang - 2024
-// https://landenlabs.com
-//
-// This file is part of llreplace project.
-//
 // ----- License ----
 //
 // Copyright (c) 2024  Dennis Lang
@@ -53,9 +47,9 @@
 
 
 #ifdef HAVE_WIN
-#define byte win_byte_override          // Fix for c++ v17
+#define byte win_byte_override  // Fix for c++ v17
 #include <windows.h>
-#undef byte                             // Fix for c++ v17
+#undef byte                     // Fix for c++ v17
 #else
     typedef unsigned int  DWORD;
     typedef struct dirent Dirent;
@@ -139,6 +133,8 @@ private:
 
 #endif
 };
+
+enum DIR_TYPES { IS_FILE, IS_DIR_BEG, IS_DIR_END };
 
 namespace DirUtil {
  lstring& getDir(lstring& outName, const lstring& inPath);

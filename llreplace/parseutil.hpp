@@ -40,7 +40,6 @@
 
 typedef std::vector<std::regex> PatternList;
 
-
 //-------------------------------------------------------------------------------------------------
 class ParseUtil {
     
@@ -144,4 +143,3 @@ public:
         std::cerr << Colors::colorize("_X_\n");
     }
 };
-
