@@ -46,6 +46,7 @@ class ParseUtil {
     
 public:
     bool ignoreCase = false;
+    bool unixRegEx = false;
     unsigned optionErrCnt = 0;
     unsigned patternErrCnt = 0;
     std::set<std::string> parseArgSet;

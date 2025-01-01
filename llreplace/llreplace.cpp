@@ -1,19 +1,19 @@
 //-------------------------------------------------------------------------------------------------
 //
-//  llreplace      9/16/2016       Dennis Lang
+//  llreplace      Dec-2024       Dennis Lang
 //
 //  Regular expression file text replacement tool
 //
 //-------------------------------------------------------------------------------------------------
 //
-// Author: Dennis Lang - 2016
+// Author: Dennis Lang - 2024
 // https://landenlabs.com/
 //
 // This file is part of llreplace project.
 //
 // ----- License ----
 //
-// Copyright (c) 2016 Dennis Lang
+// Copyright (c) 2024 Dennis Lang
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -44,17 +44,10 @@
 #include "threader.hpp" // Defines CAN_THREAD
 
 #include <assert.h>
-// #include <stdio.h>
-// #include <ctype.h>
 #include <fstream>
 #include <iostream>
-// #include <iomanip>
-// #include <stdlib.h>     // stroul
-
 #include <vector>
-// #include <map>
-// #include <set>
-// #include <algorithm>
+#include <semaphore>
 #include <regex>
 #include <exception>
 #include <chrono>   // Timing program execution
@@ -104,6 +97,8 @@ bool doReplace = false;
 bool runWithThreads = false;
 bool binaryOkay = false;
 // bool recurse = true;
+// static std::binary_semaphore lockOutput{0}; // Single thread can output to console.
+static std::counting_semaphore lockOutput{1};
 
 uint optionErrCnt = 0;
 uint patternErrCnt = 0;
@@ -118,6 +113,8 @@ const size_t MB = KB * KB;
 const size_t GB = MB * KB;
 const size_t MAX_FILE_SIZE_DEF = MB * 200;
 size_t maxFileSize = MAX_FILE_SIZE_DEF;
+const size_t MAX_LINE_LEN_DEF = 80*4;
+size_t maxLineSize = MAX_LINE_LEN_DEF;
 
 #if 0
     // Sample replace fragment.
@@ -296,19 +293,17 @@ void printParts(
                 ( (char*)matchPtr )[matchLen] = c;
                 break;
             case 'l':
-                lineLen = strcspn(begLinePtr, EOL_STR);
-
-#define COLORIZE 1
-#if COLORIZE
-                printf("%.*s", (int)(matchPtr-begLinePtr), begLinePtr);
-                std::cerr << Colors::colorize("_Y_");
-                printf("%.*s", (int)matchLen, matchPtr);
-                std::cerr << Colors::colorize("_X_");
-                printf("%.*s", int(lineLen - matchLen - ( matchPtr - begLinePtr )), matchPtr+matchLen);
-#else
-                itemFmt += "s";
-                printf(itemFmt, lstring(begLinePtr, lineLen).c_str());
-#endif
+                lineLen =  strcspn(begLinePtr, EOL_STR);
+                if (lineLen < maxLineSize) {
+                    printf("%.*s", (int)(matchPtr-begLinePtr), begLinePtr);
+                    std::cerr << Colors::colorize("_Y_");
+                    printf("%.*s", (int)matchLen, matchPtr);
+                    std::cerr << Colors::colorize("_X_");
+                    printf("%.*s", int(lineLen - matchLen - ( matchPtr - begLinePtr )), matchPtr+matchLen);
+                } else {
+                    itemFmt += "s";
+                    printf(itemFmt, lstring(begLinePtr, maxLineSize).c_str());
+                }
                 break;
                 /* 
             case 't':   // match convert using printPat
@@ -330,8 +325,8 @@ void printParts(
 }
 
 // ---------------------------------------------------------------------------
-const char* strchrRev(const char* sPtr, char want) {
-    while (*sPtr != want) {
+const char* strchrRev(const char* sPtr, char want, size_t maxRev) {
+    while (*sPtr != want && --maxRev != 0) {
         sPtr--;
     }
     return sPtr;
@@ -350,21 +345,26 @@ bool isBinary(Buffer& buffer, struct stat& filestat, const char* fullname) {
         return false;
     
     bool isBinary = false;  // filestat.st_mode & S_IXUSR
+    bool isUtf16 = false;
     if (buffer.size() > KB) {
         size_t goodCnt = 0;
+        size_t nullCnt = 0;
         unsigned char* cPtr = (unsigned char*)buffer.data();
         unsigned char* endPtr = cPtr + KB;
         while (cPtr < endPtr) {
             unsigned char c = *cPtr++;
             if (c >= 32 && c < 128)
                 goodCnt++;
+            else if (c == '\0')
+                nullCnt++;
         }
         isBinary = goodCnt < (KB/2);
+        isUtf16 = (nullCnt > goodCnt && nullCnt - goodCnt < KB/50); // utf16 is often [null, ascii]... so null cnt is similar to good cnt
     }
     if (isBinary) {
         g_binaryCnt++;
         if (isVerbose)
-            std::cerr << "Skipping binary " << fullname << std::endl;
+            std::cerr << "Skipping " << (isUtf16 ? "UTF16 ": "BINARY ") << fullname << std::endl;
     }
     return isBinary;
 }
@@ -428,10 +428,12 @@ unsigned FindFileGrep(const char* filepath) {
                     
                     if (pFilter->valid(off, len)) {
                         if (! inverseMatch) {
+                            if (matchCnt == 0)
+                                lockOutput.acquire();
                             // printParts(printPosFmt, filepath, off, len, lstring(begPtr + pos, len), strchrRev(begPtr + pos, EOL_CHR) +1);
-                            printParts(printPosFmt, filepath, off, len, begPtr + pos, strchrRev(begPtr + pos, EOL_CHR) +1);
+                            printParts(printPosFmt, filepath, off, len, begPtr + pos, strchrRev(begPtr + pos, EOL_CHR, maxLineSize) +1);
+                            matchCnt++;
                         }
-                        matchCnt++;
                     }
                     
                     begPtr += pos + len;
@@ -440,14 +442,18 @@ unsigned FindFileGrep(const char* filepath) {
                 int err = errno;
                 Colors::showError("File read exception on ", filepath, " ", strerror(err));
             }
-            return inverseMatch ? (matchCnt > 0 ? 0 : 1) : matchCnt;
+           
         } else if (in.bad()) {
             Colors::showError("Unable to open ", filepath);
         }
     } catch (exception ex) {
         Colors::showError(ex.what(), " Parsing error in file:",  filepath);
     }
-    return (matchCnt > 0) ? 1 : 0;
+    
+    if (matchCnt != 0)
+        lockOutput.release();
+    
+    return inverseMatch ? (matchCnt > 0 ? 0 : 1) : matchCnt;
 }
 
 // ---------------------------------------------------------------------------
@@ -491,19 +497,21 @@ unsigned FindLineGrep(const char* filepath) {
 
                     if (pFilter->valid(off, len)) {
                         if (! inverseMatch) {
-                            // printParts(printPosFmt, filepath, off, len, lineBuffer.substr(pos, len), lineBuffer.c_str());
+                            if (matchCnt == 0)
+                                lockOutput.acquire();
+                            
                             printParts(printPosFmt, filepath, off, len, lineBuffer.c_str()+pos, lineBuffer.c_str());
                             if (doReplace) {
                                 string result;
                                 std::regex_replace(std::back_inserter(result), lineBuffer.begin(), lineBuffer.end(), fromPat, toPat, rxFlags);
                                 std::cout << "TO=" << result << std::endl;
                             }
+                            matchCnt++;
                         }
-                        matchCnt++;
                     }
                 }
             }
-            return inverseMatch ? (matchCnt > 0 ? 0 : 1) : matchCnt;
+            
         } else if (!in.good()) {
             Colors::showError("Unable to open ", filepath);
         }
@@ -511,7 +519,10 @@ unsigned FindLineGrep(const char* filepath) {
         Colors::showError(ex.what(), " Parsing error in file:",  filepath);
     }
 
-    return 0;
+    if (matchCnt != 0)
+        lockOutput.release();
+    
+    return inverseMatch ? (matchCnt > 0 ? 0 : 1) : matchCnt;
 }
 
 // ---------------------------------------------------------------------------
@@ -719,6 +730,7 @@ static size_t ReplaceFiles(const lstring& dirname) {
     struct stat filestat;
     try {
         if (stat(dirname, &filestat) == 0 && S_ISREG(filestat.st_mode)) {
+            // TODO - check if incPat and excPat are valid before starting thread.
             fileCount += ThreadReplaceFile(dirname);
         }
     } catch (exception ex) {
@@ -727,13 +739,16 @@ static size_t ReplaceFiles(const lstring& dirname) {
 
     while (!Signals::aborted && directory.more()) {
         directory.fullName(fullname);
-        if (directory.is_directory()) {
-            if(! FileMatches(fullname, excludePathPatList, false)
-               && FileMatches(fullname, includePathPatList, true)) {
-            fileCount += ReplaceFiles(fullname);
-           }
-        } else if (fullname.length() > 0) {
-            fileCount += ThreadReplaceFile(fullname);
+        lstring name(directory.name());
+        if (!ParseUtil::FileMatches(name, excludeFilePatList, false)
+            && ParseUtil::FileMatches(name, includeFilePatList, true)
+            && ! ParseUtil::FileMatches(fullname, excludePathPatList, false)
+            && ParseUtil::FileMatches(fullname, includePathPatList, true)) {
+            if (directory.is_directory()) {
+                fileCount += ReplaceFiles(fullname);
+            } else if (fullname.length() > 0) {
+                fileCount += ThreadReplaceFile(fullname);
+            }
         }
     }
 
@@ -753,7 +768,7 @@ std::string stringer(const TT& value, const Args& ... args) {
 // ---------------------------------------------------------------------------
 void showHelp(const char* argv0) {
     const char* helpMsg =
-        "  Dennis Lang v2.5 (LandenLabs.com) " __DATE__  "\n"
+        "  Dennis Lang v2.6 (LandenLabs.com) " __DATE__  "\n"
         "\nDes: Replace text in files\n"
         "Use: llreplace [options] directories...\n"
         "\n"
@@ -770,7 +785,12 @@ void showHelp(const char* argv0) {
         "   -_y_IncludePath=<pathPattern>     ; Include path by regex match \n"
         "   -_y_ExcludePath=<pathPattern>     ; Exclude path by regex match \n"
         "   -_y_range=beg,end                 ; Optional line range filter \n"
-
+        "\n"
+        "   -_y_regex                       ; Use regex pattern not DOS pattern \n"
+        "   NOTE - Default DOS pattern converts * to .*, . to [.] and ? to . \n "
+        "          If using -_y_regex specify before pattern options\n"
+        "   Example to ignore all dot directories and files: \n"
+        "          -_y_regex -_y_exclude=\"[.].*\" \n"
         "\n"
         "   directories...                 ; Directories to scan\n"
         "\n"
@@ -780,6 +800,7 @@ void showHelp(const char* argv0) {
         "   -_y_no                            ; Dry run, show changes if replacing \n"
         "   -_y_inverse                       ; Invert Search, show files not matching \n"
         "   -_y_maxFileSize=<#MB>             ; Max file size MB, def= 200 \n"
+        "   -_y_maxLineSize=320               ; Max line shown using -from only \n"
         "   -_y_binary                        ; Include binary files \n"
 #ifdef CAN_THREAD
         "   -_y_threads                       ; Search/Replace using 20 threads \n"
@@ -821,7 +842,17 @@ void showHelp(const char* argv0) {
         "\n"
         " _P_Search and replace in-place:_X_\n"
         "  llreplace '-_y_from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' '-_y_to=MapConfigInfo.$1$2$3' '-_y_include=*.java' src\n"
-        "  llreplace '-_y_from=<block>' -till='</block>' '-_y_to=' '-_y_include=*.xml' res\n"
+        "  llreplace '-_y_from=<block>' -_y_till='</block>' '-_y_to=' '-_y_include=*.xml' res\n"
+#ifdef HAVE_WIN
+        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc=*\\\\.git  . \n"
+        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc=*\\\\.(git||vs) . \n"
+        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_Exc=.*\\\\[.](git||vs) . \n"
+#else
+        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc='*/.git'  . \n"
+        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc='*/.(git||vs)' . \n"
+        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_Exc='.*/[.](git||vs)' . \n"
+#endif
+        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_exc=\"[.](git||vs)\" . \n"
         "\n";
 
     std::cerr << Colors::colorize(stringer("\n_W_", argv0, "_X_").c_str()) << Colors::colorize(helpMsg);
@@ -890,13 +921,17 @@ int main(int argc, char* argv[]) {
                     case 'I':   // IncludePath=<pat>
                         parser.validPattern(includePathPatList, value, "IncludePath", cmdName);
                         break;
-                        case 'm':
-                            if (parser.validOption("maxFileSizeMB", cmdName))  {
-                                maxFileSize = atoi(value) * MB;
-                                maxFileSize = std::max((size_t)512, std::min(maxFileSize, GB*32));
-                                std::cerr << "MaxFileSizeMB=" << maxFileSize/MB << std::endl;
-                            }
-                            break;
+                    case 'm':
+                        if (parser.validOption("maxFileSizeMB", cmdName, false))  {
+                            maxFileSize = (size_t)(atof(value) * MB);
+                            maxFileSize = std::max((size_t)512, std::min(maxFileSize, GB*32));
+                            std::cerr << "MaxFileSizeMB=" << maxFileSize/MB << std::endl;
+                        } else if (parser.validOption("maxLineSize", cmdName))  {
+                            maxLineSize = atoi(value);
+                            maxLineSize = std::max((size_t)1, std::min(maxLineSize, KB));
+                            std::cerr << "MaxLineSize=" << maxLineSize << std::endl;
+                        }
+                        break;
                     case 'r':   // range=beg,end
                         if (parser.validOption("range", cmdName))  {
                             char* nPtr;
@@ -979,6 +1014,9 @@ int main(int argc, char* argv[]) {
                         case 'n':
                             doLineByLine = dryRun = parser.validOption("no", cmdName);
                             break;
+                        case 'r':   // -regex
+                            parser.unixRegEx = parser.validOption("regex", cmdName);
+                            break;
 #ifdef CAN_THREAD
                         case 't':
                             runWithThreads = parser.validOption("threads", cmdName);
@@ -987,6 +1025,9 @@ int main(int argc, char* argv[]) {
                         case 'v':
                             isVerbose = parser.validOption("verbose", cmdName);
                             break;
+                        case '?':
+                            showHelp(argv[0]);
+                            return 0;
                         default:
                             parser.showUnknown(argStr);
                             break;

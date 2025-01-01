@@ -58,10 +58,18 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/dennislang/opt/projects/projects-xcode/_ll"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/dennislang/opt/projects/projects-xcode/_ll/lldupdir/DerivedData/Build/Intermediates.noindex"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/dennislang/opt/projects/projects-android/_all/all-ThreadPenalty/threadPenalty/.cxx/Debug/4b3d713p/x86/.cmake/api/v1/query/client-agp/cache-v2"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/dennislang/opt/projects/projects-xcode/_ll/lldupdir"
             isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>

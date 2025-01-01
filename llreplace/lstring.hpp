@@ -4,14 +4,14 @@
 //
 //-------------------------------------------------------------------------------------------------
 //
-// Author: Dennis Lang - 2015
+// Author: Dennis Lang - 2024
 // https://landenlabs.com
 //
 // This file is part of JavaTree project.
 //
 // ----- License ----
 //
-// Copyright (c) 2015 Dennis Lang
+// Copyright (c) 2024 Dennis Lang
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,11 @@
 
 
 #include <string>
+#include <algorithm>
+#include <regex>        // ReplaceAll using regex
 
+
+// Enhanced string class
 class lstring : public std::string {
 public:
     lstring() : std::string()
@@ -49,7 +53,7 @@ public:
 
     lstring(const lstring& rhs) : std::string(rhs)
     { }
-    lstring(const lstring&& rhs) : std::string(rhs)
+    lstring(const lstring&& rhs) noexcept  : std::string(rhs)
     { }
 
     lstring(const std::string& rhs) : std::string(rhs)
@@ -93,18 +97,34 @@ public:
         this->assign(rhs);
         return *this;
     }
+
+    lstring& toLower() {
+        transform(begin(), end(), begin(),::tolower);
+        return *this;
+    }
+    lstring& toUpper() {
+        transform(begin(), end(), begin(),::toupper);
+        return *this;
+    }
+
 };
 
 
 inline lstring operator+ (const lstring& lhs, const lstring& rhs) {
     return lhs.toConstString() + rhs.toConstString();
 }
+inline std::string operator+ (const std::string& lhs, const lstring& rhs) {
+    return lhs + rhs.toConstString();
+}
+inline lstring operator+ (const lstring& lhs, const std::string& rhs) {
+    return lhs.toConstString() + rhs;
+}
 inline lstring operator+ (const lstring& lhs, const char*   rhs) {
     return lhs.toConstString() + rhs;
 }
 
 // ---------------------------------------------------------------------------
-// Replace all occurances of 'search' with 'replace'
+// Replace all matches of 'search' with 'replace'
 inline const lstring& ReplaceAll(lstring& subject,
     const lstring& search,
     const lstring& replace) {
@@ -113,5 +133,26 @@ inline const lstring& ReplaceAll(lstring& subject,
         subject.replace(pos, search.length(), replace);
         pos += replace.length();
     }
+    return subject;
+}
+
+inline const lstring& ReplaceAll(lstring& subject,
+    const char* search,
+    const char* replace) {
+    size_t pos = 0;
+    size_t searchLen = strlen(search);
+    size_t replaceLen = strlen(replace);
+    while (( pos = subject.find(search, pos) ) != lstring::npos) {
+        subject.replace(pos, searchLen, replace);
+        pos += replaceLen;
+    }
+    return subject;
+}
+
+inline const lstring& ReplaceAll(lstring& subject,
+    const std::regex & searchRE,
+    const lstring& replace) {
+    std::string result = std::regex_replace(subject, searchRE, replace);
+    subject = result;
     return subject;
 }

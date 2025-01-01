@@ -45,7 +45,6 @@
 
 typedef unsigned int uint;
 
-
 // ---------------------------------------------------------------------------
 void ParseUtil::showUnknown(const char* argStr) {
     std::cerr << Colors::colorize("Use -h for help.\n_Y_Unknown option _R_") << argStr << Colors::colorize("_X_\n");
@@ -61,6 +60,8 @@ std::regex ParseUtil::getRegEx(const char* value) {
         return ignoreCase ? std::regex(valueStr, regex_constants::icase) : std::regex(valueStr);
     } catch (const std::regex_error& regEx) {
         Colors::showError("Invalid regular expression ", regEx.what(), ", Pattern=", value);
+    } catch (...) {
+        Colors::showError("Invalid regular expression=", value);
     }
 
     patternErrCnt++;
@@ -90,10 +91,16 @@ bool ParseUtil::validOption(const char* validCmd, const char* possibleCmd, bool 
 bool ParseUtil::validPattern(PatternList& outList, lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr) {
     bool isOk = validOption(validCmd, possibleCmd, reportErr);
     if (isOk) {
-        ReplaceAll(value, "*", ".*");
-        ReplaceAll(value, "?", ".");
+        if (!unixRegEx) {
+            // Convert simple DOS patterns to regular expression
+            //  .   -> [.]    // match on dot
+            //  *   ->  .*    // zero or more of anything
+            //  ?   ->  .     // single any character
+            ReplaceAll(value, std::regex("([^[])[.]"), "$1[.]");
+            ReplaceAll(value, "*", ".*");
+            ReplaceAll(value, "?", ".");
+        }
         outList.push_back(getRegEx(value));
-        return true;
     }
     return isOk;
 }
@@ -176,7 +183,11 @@ lstring& ParseUtil::convertSpecialChar(lstring& inOut) {
             default:
                 Colors::showError("Warning: unrecognized escape sequence:", inPtr);
                 throw( "Warning: unrecognized escape sequence" );
-            case '\\':
+            case '\0': // Trailing slash
+                inPtr--;
+                break;
+            case '\\':      // Double slash becomes single
+                *outPtr++ = *inPtr;
             case '\?':
             case '\'':
             case '\"':
