@@ -641,8 +641,11 @@ static size_t ReplaceFile(const lstring& inFullname) {
     DirUtil::getName(name, inFullname);
 
     if (! name.empty()
-        && ! FileMatches(name, excludeFilePatList, false)
-        && FileMatches(name, includeFilePatList, true)) {
+            && ! ParseUtil::FileMatches(name, excludeFilePatList, false)
+            && ParseUtil::FileMatches(name, includeFilePatList, true)
+            && ! ParseUtil::FileMatches(inFullname, excludePathPatList, false)
+            && ParseUtil::FileMatches(inFullname, includePathPatList, true)
+        ) {
         if (doReplace && !dryRun) {
             string outFullname = (outFile.length() != 0) ? outFile : inFullname;
             if (ReplaceFile(inFullname, outFullname, name)) {
@@ -741,9 +744,10 @@ static size_t ReplaceFiles(const lstring& dirname) {
         directory.fullName(fullname);
         lstring name(directory.name());
         if (!ParseUtil::FileMatches(name, excludeFilePatList, false)
-            && ParseUtil::FileMatches(name, includeFilePatList, true)
+        //    && ParseUtil::FileMatches(name, includeFilePatList, true)
             && ! ParseUtil::FileMatches(fullname, excludePathPatList, false)
-            && ParseUtil::FileMatches(fullname, includePathPatList, true)) {
+       //     && ParseUtil::FileMatches(fullname, includePathPatList, true)
+            ) {
             if (directory.is_directory()) {
                 fileCount += ReplaceFiles(fullname);
             } else if (fullname.length() > 0) {
@@ -768,7 +772,7 @@ std::string stringer(const TT& value, const Args& ... args) {
 // ---------------------------------------------------------------------------
 void showHelp(const char* argv0) {
     const char* helpMsg =
-        "  Dennis Lang v2.6 (LandenLabs.com) " __DATE__  "\n"
+        "  Dennis Lang v2.7 (LandenLabs.com) " __DATE__  "\n"
         "\nDes: Replace text in files\n"
         "Use: llreplace [options] directories...\n"
         "\n"
