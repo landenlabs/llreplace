@@ -102,7 +102,12 @@ static std::counting_semaphore lockOutput{1};
 
 uint optionErrCnt = 0;
 uint patternErrCnt = 0;
+#ifdef HAVE_WIN
+lstring printPosFmt = "%r\\%f(%o) %l\n";
+#else
 lstring printPosFmt = "%r/%f(%o) %l\n";
+#endif
+
 lstring cwd;    // current working directory
 
 const char EXTN_CHAR = '.';
@@ -812,7 +817,11 @@ void showHelp(const char* argv0) {
 #endif
         "\n"
         "_P_PrintFmt:_X_ \n"
+#ifdef HAVE_WIN
+        "   -_y_printFmt=' %r\\%f(%o) %l\\n'    ; Printf format to present match \n"
+#else
         "   -_y_printFmt=' %r/%f(%o) %l\\n'    ; Printf format to present match \n"
+#endif
         "    Each special character can include minWidth.maxWidth\n"
         "       %10s     = pad out to 10 wide minimum\n"
         "       %10.10s  = pad out to 10 wide min and clip to max of 10 \n"

@@ -242,7 +242,7 @@ bool DirUtil::makeWriteableFile(const char* filePath, struct stat* info) {
 //-------------------------------------------------------------------------------------------------
 // [static] Extract directory part from path.
 lstring& DirUtil::getDir(lstring& outDir, const lstring& inPath) {
-    size_t nameStart = inPath.rfind(SLASH_CHAR);
+    size_t nameStart = inPath.rfind(Directory_files::SLASH_CHAR);
     if (nameStart == string::npos)
         outDir.clear();
     else
@@ -253,7 +253,7 @@ lstring& DirUtil::getDir(lstring& outDir, const lstring& inPath) {
 //-------------------------------------------------------------------------------------------------
 // Extract name part from path.
 lstring& DirUtil::getName(lstring& outName, const lstring& inPath) {
-    size_t nameStart = inPath.rfind(SLASH_CHAR);
+    size_t nameStart = inPath.rfind(Directory_files::SLASH_CHAR);
     if (nameStart == std::string::npos)
         outName = inPath;
     else
