@@ -153,6 +153,7 @@ Filter* pFilter = &nopFilter;
 unsigned long g_regSearchCnt = 0;
 unsigned long g_fileCnt = 0;
 unsigned long g_binaryCnt = 0;
+unsigned long g_utf16Cnt = 0;
 
 
 
@@ -370,6 +371,9 @@ bool isBinary(Buffer& buffer, struct stat& filestat, const char* fullname) {
         g_binaryCnt++;
         if (isVerbose)
             std::cerr << "Skipping " << (isUtf16 ? "UTF16 ": "BINARY ") << fullname << std::endl;
+    }
+    if (isUtf16) {
+        g_utf16Cnt++;
     }
     return isBinary;
 }
@@ -777,7 +781,7 @@ std::string stringer(const TT& value, const Args& ... args) {
 // ---------------------------------------------------------------------------
 void showHelp(const char* argv0) {
     const char* helpMsg =
-        "  Dennis Lang v2.7 (LandenLabs.com) " __DATE__  "\n"
+        "  Dennis Lang v2.8 (LandenLabs.com) " __DATE__  "\n"
         "\nDes: Replace text in files\n"
         "Use: llreplace [options] directories...\n"
         "\n"
@@ -1102,11 +1106,13 @@ int main(int argc, char* argv[]) {
             } else {
                 std::cerr << "Elapsed " << milli.count() << " milliSeconds" << endl;
             }
-            std::cerr << "FilesChecked= " << g_fileCnt << endl;
-            std::cerr << "BinarySkipped=" << g_binaryCnt << endl;
-            std::cerr << "FilesMatched= " << fileMatchCnt << endl;
+            std::cerr << "Files Checked= " << g_fileCnt << endl;
+            std::cerr << "Binary Skipped=" << g_binaryCnt << endl;
+            if (g_utf16Cnt != 0) 
+                std::cerr << "UTF16 Skipped=" << g_binaryCnt << endl;
+            std::cerr << "Files Matched= " << fileMatchCnt << endl;
             if (toPat.empty() || doLineByLine) {
-                std::cerr << "LinesMatched= " <<  g_regSearchCnt << endl;
+                std::cerr << "Lines Matched= " <<  g_regSearchCnt << endl;
             }
 
         } else {
