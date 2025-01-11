@@ -190,6 +190,10 @@ Directory_files::~Directory_files() {
 bool Directory_files::more() {
     if (my_is_more) {
         my_pDirEnt = readdir(my_pDir);
+        if (my_pDirEnt == nullptr && errno != 0) {
+            int error = errno;
+            std::cerr << my_baseDir <<  " error=" << strerror(error) << std::endl;
+        }
         my_is_more = my_pDirEnt != NULL;
         if (my_is_more) {
             if (my_pDirEnt->d_type == DT_DIR) {

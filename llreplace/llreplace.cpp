@@ -741,25 +741,34 @@ static size_t ReplaceFiles(const lstring& dirname) {
 
     struct stat filestat;
     try {
-        if (stat(dirname, &filestat) == 0 && S_ISREG(filestat.st_mode)) {
-            // TODO - check if incPat and excPat are valid before starting thread.
-            fileCount += ThreadReplaceFile(dirname);
+        int err = stat(dirname, &filestat);
+        if ( err == 0) {
+            if (S_ISREG(filestat.st_mode)) {
+                // TODO - check if incPat and excPat are valid before starting thread.
+                fileCount += ThreadReplaceFile(dirname);
+            } else if (!S_ISDIR(filestat.st_mode)) {
+                return 0;  // not a file or a directory
+#ifndef HAVE_WIN
+            } else if (access(dirname, X_OK) != 0) {
+                Colors::showError("Unable to access ", dirname, " ", strerror(errno));
+                return 0;
+#endif
+            }
         }
     } catch (exception ex) {
         // Probably a pattern, let directory scan do its magic.
+        Colors::showError(ex.what());
     }
 
     while (!Signals::aborted && directory.more()) {
         directory.fullName(fullname);
         lstring name(directory.name());
-        if (!ParseUtil::FileMatches(name, excludeFilePatList, false)
-        //    && ParseUtil::FileMatches(name, includeFilePatList, true)
-            && ! ParseUtil::FileMatches(fullname, excludePathPatList, false)
-       //     && ParseUtil::FileMatches(fullname, includePathPatList, true)
-            ) {
+        if (! ParseUtil::FileMatches(fullname, excludePathPatList, false)
+            && ParseUtil::FileMatches(fullname, includePathPatList, true)
+            && !ParseUtil::FileMatches(name, excludeFilePatList, false) ) {
             if (directory.is_directory()) {
                 fileCount += ReplaceFiles(fullname);
-            } else if (fullname.length() > 0) {
+            } else if (fullname.length() > 0 && ParseUtil::FileMatches(name, includeFilePatList, true)) {
                 fileCount += ThreadReplaceFile(fullname);
             }
         }

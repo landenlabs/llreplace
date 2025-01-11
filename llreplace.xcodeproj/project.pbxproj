@@ -29,7 +29,7 @@
 /* Begin PBXFileReference section */
 		9A06FEC32D1F525300C62CF9 /* threader.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = threader.hpp; sourceTree = "<group>"; };
 		9A06FEC42D1F525300C62CF9 /* threader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = threader.cpp; sourceTree = "<group>"; };
-		9A5C03D62D25AA1200460BCD /* llreplace */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = llreplace; sourceTree = BUILT_PRODUCTS_DIR; };
+		9A5C03D62D25AA1200460BCD /* llreplace */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; name = llreplace; path = "/Users/dennislang/opt/projects/projects-xcode/_ll/llreplace/build/Debug/llreplace"; sourceTree = "<absolute>"; };
 		9AB237242CF8E430007446E8 /* parseutil.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = parseutil.hpp; sourceTree = "<group>"; };
 		9AB237252CF8E430007446E8 /* parseutil.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = parseutil.cpp; sourceTree = "<group>"; };
 		9AFA96122D11BEEF002F76BA /* signals.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = signals.hpp; sourceTree = "<group>"; };
@@ -57,7 +57,6 @@
 			isa = PBXGroup;
 			children = (
 				B9B44DBF1D8F65CD00782398 /* llreplace */,
-				9A5C03D62D25AA1200460BCD /* llreplace */,
 			);
 			sourceTree = "<group>";
 		};
