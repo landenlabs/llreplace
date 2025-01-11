@@ -105,7 +105,7 @@ void Threader::waitForAll(Job* jobPtr) {
     for (int idx = 0; idx < 10 && threadJobCnt > 0; idx++) {
         clearDoneJobs(jobPtr);
         if (threadJobCnt != 0)
-            threadLimiter.try_acquire_for(std::chrono::seconds(10));    // threadLimiter.acquire();
+            (void)threadLimiter.try_acquire_for(std::chrono::seconds(10));    // threadLimiter.acquire();
 #if 0
         std::cerr << "Waiting for threads " << threadJobCnt << " to complete\n";
         ThreadJobs::iterator jobIter = threadJobs.begin();
