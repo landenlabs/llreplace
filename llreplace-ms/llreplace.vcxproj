@@ -142,6 +142,7 @@
     <ClInclude Include="..\llreplace\lstring.hpp" />
     <ClInclude Include="..\llreplace\parseutil.hpp" />
     <ClInclude Include="..\llreplace\signals.hpp" />
+    <ClInclude Include="..\llreplace\swapstream.hpp" />
     <ClInclude Include="..\llreplace\threader.hpp" />
     <ClInclude Include="resource.h" />
   </ItemGroup>

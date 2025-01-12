@@ -42,6 +42,7 @@
 #include "directory.hpp"
 #include "filters.hpp"
 #include "threader.hpp" // Defines CAN_THREAD
+#include "swapstream.hpp"
 
 #include <assert.h>
 #include <fstream>
@@ -83,8 +84,9 @@ PatternList excludeFilePatList;
 PatternList includePathPatList;
 PatternList excludePathPatList;
 StringList fileDirList;
-lstring outFile;
 lstring printPat;
+lstring outFile;
+ofstream out;   // If "from" only, outFile is optionally used for output report. 
 
 bool isVerbose = false;
 bool doLineByLine = false;      // What is this for ?, should it be a switch
@@ -96,6 +98,9 @@ bool progress = true;           // Show progress
 bool doReplace = false;
 bool runWithThreads = false;
 bool binaryOkay = false;
+bool quiet = false;
+
+
 // bool recurse = true;
 // static std::binary_semaphore lockOutput{0}; // Single thread can output to console.
 static std::counting_semaphore lockOutput{1};
@@ -824,6 +829,8 @@ void showHelp(const char* argv0) {
         "   -_y_maxFileSize=<#MB>             ; Max file size MB, def= 200 \n"
         "   -_y_maxLineSize=320               ; Max line shown using -from only \n"
         "   -_y_binary                        ; Include binary files \n"
+        "   -_y_quiet                         ; Do not show matches \n"
+        "   -_y_line                          ; Force line-by-line compare, def: entire file \n"
 #ifdef CAN_THREAD
         "   -_y_threads                       ; Search/Replace using 20 threads \n"
         "   -_y_threads=<#threads>            ; Search/Replace using threads \n"
@@ -861,10 +868,18 @@ void showHelp(const char* argv0) {
         "\n"
         "_p_Examples\n"
         " Search only, show patterns and defaults showing file and match:\n"
+#ifdef HAVE_WIN
+        "  llreplace -_y_from='Copyright' -_y_include=*.java -_y_print='%r/%f\\n' src1 src2\n"
+        "  llreplace -_y_from='Copyright' -_y_include=*.java -_y_include=*.xml -_y_print='%s' -_y_inverse src res\n"
+#else
         "  llreplace -_y_from='Copyright' '-_y_include=*.java' -_y_print='%r/%f\\n' src1 src2\n"
         "  llreplace -_y_from='Copyright' '-_y_include=*.java' -_y_include='*.xml' -_y_print='%s' -_y_inverse src res\n"
+#endif
         "  llreplace '-_y_from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]'  '-_y_include=*.java' -_y_range=0,10 -_y_range=20,-1 -_y_printFmt='%f %03d: ' src1 src2\n"
         "  llreplace -_y_printFmt=\"%m\\n\" -_y_from=\"<section id='trail-stats'>((?!</section).|\\r|\\n)*</section>\" \n"
+        "\n"
+        "  _y_output option can be used with search to save matches. Default is to console\n"
+        "  llreplace -_y_out=matches.txt  -from=Copyright dir1 dir2 file1 file2 \n"
         "\n"
         " _P_Search and replace in-place:_X_\n"
         "  llreplace '-_y_from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' '-_y_to=MapConfigInfo.$1$2$3' '-_y_include=*.java' src\n"
@@ -1037,9 +1052,16 @@ int main(int argc, char* argv[]) {
                             } else 
                                 inverseMatch = parser.validOption("inverse", cmdName);
                             break;
+                        case 'l':
+                            doLineByLine = parser.validOption("lineByLine", cmdName);
+                            break;
                         case 'n':
                             doLineByLine = dryRun = parser.validOption("no", cmdName);
                             break;
+                        case 'q':   
+                            quiet = parser.validOption("quiet", cmdName);
+                            break;
+
                         case 'r':   // -regex
                             parser.unixRegEx = parser.validOption("regex", cmdName);
                             break;
@@ -1072,6 +1094,19 @@ int main(int argc, char* argv[]) {
         }
 
         if (patternErrCnt == 0 && optionErrCnt == 0 && fileDirList.size() != 0) {
+            SwapStream swapStream(cout);
+            if (quiet) {
+                ofstream null("null");
+                swapStream.swap(null);
+                fclose(stdout);
+            } else if (outFile.length() > 0 && !doReplace) {
+                out.open(outFile);
+                if (out.good()) {
+                    swapStream.swap(out);
+                    freopen(outFile, "w", stdout);
+                }
+            }
+
             // Get starting timepoint
             auto start = std::chrono::high_resolution_clock::now();
             ReplaceFilesInit();
@@ -1121,12 +1156,15 @@ int main(int argc, char* argv[]) {
                 std::cerr << "UTF16 Skipped=" << g_binaryCnt << endl;
             std::cerr << "Files Matched= " << fileMatchCnt << endl;
             if (toPat.empty() || doLineByLine) {
-                std::cerr << "Lines Matched= " <<  g_regSearchCnt << endl;
+                std::cerr << (doLineByLine ? "Lines " : "Patterns ") << "Matched= " << g_regSearchCnt << endl;
             }
 
         } else {
             showHelp(argv[0]);
         }
+
+        if (out.tellp() > 0)
+            out.close();
 
         std::cerr << std::endl;
     }
