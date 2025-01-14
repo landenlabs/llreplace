@@ -54,11 +54,11 @@
       <CommandLineArguments>
          <CommandLineArgument
             argument = "-ignore"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "-inc=build.gradle"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "-from=&quot;landenlabs&quot;"
@@ -78,7 +78,7 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Volumes/DennisBacku/backup-mac/Backup2023-12-22/projects/projects-android"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/dennislang/opt/projects/projects-xcode/_ll/lldupdir/DerivedData/Build/Intermediates.noindex"
@@ -91,6 +91,10 @@
          <CommandLineArgument
             argument = "/Users/dennislang/opt/projects/projects-xcode/_ll/lldupdir"
             isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/dennislang/opt/android/atak/atak-plugin-investigation/atak-civ/plugin-examples"
+            isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>

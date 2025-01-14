@@ -189,10 +189,11 @@ Directory_files::~Directory_files() {
 //-------------------------------------------------------------------------------------------------
 bool Directory_files::more() {
     if (my_is_more) {
+        errno = 0;
         my_pDirEnt = readdir(my_pDir);
         if (my_pDirEnt == nullptr && errno != 0) {
             int error = errno;
-            std::cerr << my_baseDir <<  " error=" << strerror(error) << std::endl;
+            std::cerr << my_baseDir <<  " Eror=" << strerror(error) << std::endl;
         }
         my_is_more = my_pDirEnt != NULL;
         if (my_is_more) {
