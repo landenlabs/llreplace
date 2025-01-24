@@ -194,10 +194,11 @@ lstring getPartName(const char* filepath) {
     return result;
 }
 // ---------------------------------------------------------------------------
+static lstring EMPTY_LSTR;
 lstring getPartExt(const char* filepath) {
     lstring result = filepath;
     size_t pos = result.find_last_of(EXTN_CHAR);
-    return result.substr(pos);
+    return (pos == std::string::npos) ? EMPTY_LSTR : result.substr(pos);
 }
 // ---------------------------------------------------------------------------
 lstring parts(const char* filepath, bool dir, bool name, bool ext) {
@@ -445,7 +446,7 @@ unsigned FindFileGrep(const char* filepath) {
                             if (matchCnt == 0)
                                 lockOutput.acquire();
                             // printParts(printPosFmt, filepath, off, len, lstring(begPtr + pos, len), strchrRev(begPtr + pos, EOL_CHR) +1);
-                            printParts(printPosFmt, filepath, off, len, begPtr + pos, strchrRev(begPtr + pos, EOL_CHR, maxLineSize) +1);
+                            printParts(printPosFmt, filepath, off, len, begPtr + pos, strchrRev(begPtr + pos, EOL_CHR, min(pos, maxLineSize)) +1);
                             matchCnt++;
                         }
                     }
