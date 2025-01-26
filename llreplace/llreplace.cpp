@@ -9,8 +9,6 @@
 // Author: Dennis Lang - 2024
 // https://landenlabs.com/
 //
-// This file is part of llreplace project.
-//
 // ----- License ----
 //
 // Copyright (c) 2024 Dennis Lang
@@ -34,6 +32,8 @@
 
 // 4291 - No matching operator delete found
 #pragma warning( disable : 4291 )
+
+#define VERSION "v2.9"
 
 // Project files
 #include "ll_stdhdr.hpp"
@@ -796,7 +796,7 @@ std::string stringer(const TT& value, const Args& ... args) {
 // ---------------------------------------------------------------------------
 void showHelp(const char* argv0) {
     const char* helpMsg =
-        "  Dennis Lang v2.8 (LandenLabs.com) " __DATE__  "\n"
+        "  Dennis Lang " VERSION " (LandenLabs.com) " __DATE__  "\n"
         "\nDes: Replace text in files\n"
         "Use: llreplace [options] directories...\n"
         "\n"
@@ -808,19 +808,21 @@ void showHelp(const char* argv0) {
         "   -_y_backupDir=<directory>         ; Optional Path to store backup copy before change\n"
         "   -_y_out= - | outfilepath          ; Optional alternate output, default is input file \n"
         "\n"
-        "   -_y_includeFile=<filePattern>     ; Include files by regex match \n"
-        "   -_y_excludeFile=<filePattern>     ; Exclude files by regex match \n"
+        "   -_y_includeItem=<filePattern>     ; Include files or dir by regex match \n"
+        "   -_y_excludeItem=<filePattern>     ; Exclude files or dir by regex match \n"
         "   -_y_IncludePath=<pathPattern>     ; Include path by regex match \n"
         "   -_y_ExcludePath=<pathPattern>     ; Exclude path by regex match \n"
         "   -_y_range=beg,end                 ; Optional line range filter \n"
         "\n"
-        "   -_y_regex                       ; Use regex pattern not DOS pattern \n"
-        "   NOTE - Default DOS pattern converts * to .*, . to [.] and ? to . \n "
-        "          If using -_y_regex specify before pattern options\n"
-        "   Example to ignore all dot directories and files: \n"
+        "   -_y_regex                         ; Use regex pattern not DOS pattern \n"
+        "        The include/exclude patterns do an internal conversion to full regex \n"
+        "          *  -> .*     and ? -> .   \n"
+        "        Ex: \"*.png\"   internally becomes  \".*.png\" \n"
+        "        Use -_y_regex before -inc/-exc options to force native regex pattern\n"
+        "     Example to ignore all dot directories and files: \n"
         "          -_y_regex -_y_exclude=\"[.].*\" \n"
         "\n"
-        "   directories...                 ; Directories to scan\n"
+        "   directories...                 ; Directories or files  to scan\n"
         "\n"
         "_P_Other options:_X_\n"
         "   -_y_ignoreCase                    ; Next pattern set to ignore case \n"
@@ -945,12 +947,12 @@ int main(int argc, char* argv[]) {
                             ParseUtil::convertSpecialChar(value);
                             ignorePat = parser.getRegEx(value);
                             // doLineByLine = value.find("\n") == std::string::npos;
-                        } else {  // includeFile=<pat>
-                            parser.validPattern(includeFilePatList, value, "includeFile", cmdName);
+                        } else {  // includeItem=<pat>
+                            parser.validPattern(includeFilePatList, value, "includeItem", cmdName);
                         }
                         break;
-                    case 'e':   // excludeFile=<pat>
-                        if (parser.validPattern(excludeFilePatList, value, "excludeFile", cmdName, false)) {
+                    case 'e':   // excludeItem=<pat>
+                        if (parser.validPattern(excludeFilePatList, value, "excludeItem", cmdName, false)) {
                         } else  if (parser.validOption("end", cmdName)) {
                             ParseUtil::convertSpecialChar(value);
                             endPat = parser.getRegEx(value);
@@ -1073,6 +1075,8 @@ int main(int argc, char* argv[]) {
 #endif
                         case 'v':
                             isVerbose = parser.validOption("verbose", cmdName);
+                            break;
+                        case '-':
                             break;
                         case '?':
                             showHelp(argv[0]);

@@ -8,7 +8,7 @@
 // Author: Dennis Lang - 2015
 // https://landenlabs.com
 //
-// This file is part of JavaTree project.
+//  
 //
 // ----- License ----
 //

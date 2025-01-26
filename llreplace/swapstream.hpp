@@ -9,7 +9,7 @@
 // Author: Dennis Lang - 2019
 // https://landenlabs.com
 //
-// This file is part of llclasses project.
+//  
 //
 // ----- License ----
 //
