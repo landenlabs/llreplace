@@ -54,15 +54,27 @@
       <CommandLineArguments>
          <CommandLineArgument
             argument = "-ignore"
-            isEnabled = "NO">
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "-inverse"
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "-inc=build.gradle"
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
+            argument = "-inc=*.cpp"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
             argument = "-from=&quot;landenlabs&quot;"
-            isEnabled = "NO">
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "-until=Copy"
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "-from=datastore"
@@ -70,7 +82,7 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "-from=&quot;.*git-notes.txt[\\r\\n]&quot;"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/dennislang/opt/projects/projects-xcode/_ll"
@@ -94,7 +106,7 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/dennislang/opt/projects/projects-xcode/_ll/lldupdir"
-            isEnabled = "NO">
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/dennislang/opt/android/atak/atak-plugin-investigation/atak-civ/plugin-examples"
@@ -102,7 +114,7 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/dennislang/opt/projects/projects-xcode/_ll/llreplace/test"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>

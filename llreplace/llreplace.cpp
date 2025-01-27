@@ -413,7 +413,7 @@ unsigned FindFileGrep(const char* filepath) {
         
         in.open(filepath);
         if (in.good() && filestat.st_size > 0 && S_ISREG(filestat.st_mode)) {
-
+            
             try {
                 Buffer buffer(filestat.st_size+1);
                 buffer[0] = EOL_CHR;
@@ -432,8 +432,6 @@ unsigned FindFileGrep(const char* filepath) {
                 fileProgress(filepath);   // g_fileCnt++;
                 while (begPtr < endPtr && std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)) {
                     g_regSearchCnt++;
-                    // for (auto group : match)
-                    //    std::cout << group << endl;
                     
                     size_t pos = match.position();
                     size_t len = match.length();
@@ -449,8 +447,8 @@ unsigned FindFileGrep(const char* filepath) {
                                 lockOutput.acquire();
                             // printParts(printPosFmt, filepath, off, len, lstring(begPtr + pos, len), strchrRev(begPtr + pos, EOL_CHR) +1);
                             printParts(printPosFmt, filepath, off, len, begPtr + pos, strchrRev(begPtr + pos, EOL_CHR, min(pos, maxLineSize)) +1);
-                            matchCnt++;
                         }
+                        matchCnt++;
                     }
                     
                     begPtr += pos + len;
@@ -460,6 +458,10 @@ unsigned FindFileGrep(const char* filepath) {
                 Colors::showError("File read exception on ", filepath, " ", strerror(err));
             }
            
+            if (inverseMatch && matchCnt == 0) {
+                char dummy[] = "\n";
+                printParts(printPosFmt, filepath, 0, filestat.st_size, dummy, dummy);
+            }
         } else if (in.bad()) {
             Colors::showError("Unable to open ", filepath);
         }
@@ -527,6 +529,11 @@ unsigned FindLineGrep(const char* filepath) {
                         }
                     }
                 }
+            }
+            
+            if (inverseMatch && matchCnt == 0) {
+                char dummy[] = "\n";
+                printParts(printPosFmt, filepath, 0, filestat.st_size, dummy, dummy);
             }
             
         } else if (!in.good()) {
