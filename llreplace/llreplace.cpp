@@ -33,7 +33,7 @@
 // 4291 - No matching operator delete found
 #pragma warning( disable : 4291 )
 
-#define VERSION "v2.9"
+#define VERSION "v2.10"
 
 // Project files
 #include "ll_stdhdr.hpp"
@@ -222,9 +222,9 @@ lstring parts(const char* filepath, bool dir, bool name, bool ext) {
 void printParts(
     const char* customFmt,
     const char* filepath,
-    size_t fileOffset,
-    size_t matchLen,
-    const char* matchPtr, 
+    unsigned long fileOffset,
+    unsigned long matchLen,
+    const char* matchPtr,
     const char* begLinePtr) {
 
     const int NONE = 12345;
@@ -305,13 +305,17 @@ void printParts(
                 ( (char*)matchPtr )[matchLen] = c;
                 break;
             case 'l':
-                lineLen =  strcspn(begLinePtr, EOL_STR);
+                lineLen = strcspn(begLinePtr, EOL_STR);
                 if (lineLen < maxLineSize) {
-                    printf("%.*s", (int)(matchPtr-begLinePtr), begLinePtr);
+                    int prefixLen = (int)(matchPtr - begLinePtr);
+                    if (prefixLen > 0)
+                        printf("%.*s", prefixLen, begLinePtr);
                     std::cerr << Colors::colorize("_Y_");
                     printf("%.*s", (int)matchLen, matchPtr);
                     std::cerr << Colors::colorize("_X_");
-                    printf("%.*s", int(lineLen - matchLen - ( matchPtr - begLinePtr )), matchPtr+matchLen);
+                    int postLen = int(lineLen - matchLen - prefixLen);
+                    if (postLen > 0)
+                        printf("%.*s", postLen, matchPtr+matchLen);
                 } else {
                     itemFmt += "s";
                     printf(itemFmt, lstring(begLinePtr, maxLineSize).c_str());
@@ -424,11 +428,9 @@ unsigned FindFileGrep(const char* filepath) {
                 const char* endPtr = begPtr + inCnt;
                 size_t off = 0;
                 pFilter->init(buffer.data());
-                
-
 
                 fileProgress(filepath);   // g_fileCnt++;
-                while (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)) {
+                while (begPtr < endPtr && std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)) {
                     g_regSearchCnt++;
                     // for (auto group : match)
                     //    std::cout << group << endl;
@@ -929,14 +931,13 @@ int main(int argc, char* argv[]) {
                         if (parser.validOption("backupDir", cmdName, false))
                             backupDir = value;
                         else if (parser.validOption("begin", cmdName, false)) {
-                            ParseUtil::convertSpecialChar(value);
                             beginPat = parser.getRegEx(value);
                             // doLineByLine = value.find("\n") == std::string::npos;
                         }
                         break;
                     case 'f':   // from=<pat>
                         if (parser.validOption("from", cmdName)) {
-                            fromPat = parser.getRegEx(ParseUtil::convertSpecialChar(value));
+                            fromPat = parser.getRegEx(value);
                             findMode = FROM;
                             // doLineByLine = value.find("\n") == std::string::npos;
                         }
@@ -944,7 +945,6 @@ int main(int argc, char* argv[]) {
 
                     case 'i': // -ignore=<pattern>
                         if (parser.validOption("ignore", cmdName, false)) {
-                            ParseUtil::convertSpecialChar(value);
                             ignorePat = parser.getRegEx(value);
                             // doLineByLine = value.find("\n") == std::string::npos;
                         } else {  // includeItem=<pat>
@@ -954,7 +954,6 @@ int main(int argc, char* argv[]) {
                     case 'e':   // excludeItem=<pat>
                         if (parser.validPattern(excludeFilePatList, value, "excludeItem", cmdName, false)) {
                         } else  if (parser.validOption("end", cmdName)) {
-                            ParseUtil::convertSpecialChar(value);
                             endPat = parser.getRegEx(value);
                             // doLineByLine = value.find("\n") == std::string::npos;
                         }

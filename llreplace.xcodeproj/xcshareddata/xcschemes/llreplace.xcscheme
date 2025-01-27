@@ -66,6 +66,10 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "-from=datastore"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "-from=&quot;.*git-notes.txt[\\r\\n]&quot;"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
@@ -94,6 +98,10 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/dennislang/opt/android/atak/atak-plugin-investigation/atak-civ/plugin-examples"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/dennislang/opt/projects/projects-xcode/_ll/llreplace/test"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>

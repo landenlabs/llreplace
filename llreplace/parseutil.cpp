@@ -182,7 +182,15 @@ lstring& ParseUtil::convertSpecialChar(lstring& inOut) {
                 inPtr--;
                 break;
             case '\\':      // Double slash becomes single
-                *outPtr++ = *inPtr;
+                // Special case - Xcode does not correctly pass \n in debug argument scheme,
+                // So add special logic to treat \\n and \\r as \n and \r
+                if (inPtr[1] == 'r') {
+                    *outPtr = '\r'; inPtr++;
+                } else if (inPtr[1] == 'n') {
+                    *outPtr = '\n'; inPtr++;
+                } else {
+                    *outPtr++ = *inPtr;
+                }
             case '\?':
             case '\'':
             case '\"':

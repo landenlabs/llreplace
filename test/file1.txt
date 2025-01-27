@@ -1,0 +1,25 @@
+total 224
+drwxrwx---  24 dennislang  staff  -        768 Jan 27 14:14:35 2025 ./
+drwxrwx---  35 dennislang  staff  -       1120 Jan  1 22:13:52 2025 ../
+-rw-r--r--@  1 dennislang  staff  hidden  6148 Dec 31 18:46:29 2024 .DS_Store
+drwxr-xr-x  15 dennislang  staff  -        480 Jan 27 14:14:10 2025 .git/
+-rw-r--r--@  1 dennislang  staff  -        154 Dec 14 13:19:29 2024 .gitignore
+-rw-rw----   1 dennislang  staff  -        353 Jan  9 08:47:02 2020 .travis.yml
+drwxr-xr-x@  7 dennislang  staff  -        224 Jan 11 13:31:59 2025 DerivedData/
+-rw-r--r--   1 dennislang  staff  -      11344 Nov 27 17:04:12 2024 LICENSE.txt
+-rw-r--r--@  1 dennislang  staff  -       4935 Jan 26 10:25:58 2025 README.md
+-rw-r--r--   1 dennislang  staff  -        798 Dec  2 10:23:29 2024 clean-dirs.bat
+-rwxr-xr-x   1 dennislang  staff  -        246 Nov 29 10:26:36 2024 clean-dirs.csh*
+-rw-rw----   1 dennislang  staff  -        286 Dec 14 12:14:49 2024 git-notes.txt
+-rw-r--r--@  1 dennislang  staff  -       1072 Jan 14 09:09:08 2025 install-llreplace.bat
+-rwxr-xr-x@  1 dennislang  staff  -        746 Jan  1 11:51:13 2025 install-llreplace.csh*
+drwxrwx---  17 dennislang  staff  -        544 Jan 26 10:25:58 2025 llreplace/
+drwxr-xr-x  11 dennislang  staff  -        352 Jan 26 10:25:58 2025 llreplace-ms/
+drwxrwx---@  6 dennislang  staff  -        192 Jan 11 13:40:19 2025 llreplace.xcodeproj/
+-rw-r--r--   1 dennislang  staff  -       1052 Nov 27 17:04:12 2024 make-backup.bat
+-rwxr-xr-x   1 dennislang  staff  -        703 Nov 27 17:04:12 2024 make-backup.csh*
+-rw-r--r--   1 dennislang  staff  -       9759 Nov 29 09:51:23 2024 parseutil.cpp
+-rw-r--r--   1 dennislang  staff  -       6186 Nov 29 09:51:23 2024 parseutil.hpp
+drwxr-xr-x  11 dennislang  staff  -        352 Jan 27 14:15:11 2025 test/
+-rw-r--r--@  1 dennislang  staff  -      20972 Jan 26 10:25:58 2025 test.zip
+-rwxr-xr-x   1 dennislang  staff  -        376 Nov 27 17:04:12 2024 update-bin.csh*
