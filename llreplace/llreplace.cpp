@@ -525,8 +525,8 @@ unsigned FindLineGrep(const char* filepath) {
                                 std::regex_replace(std::back_inserter(result), lineBuffer.begin(), lineBuffer.end(), fromPat, toPat, rxFlags);
                                 std::cout << "TO=" << result << std::endl;
                             }
-                            matchCnt++;
                         }
+                        matchCnt++;
                     }
                 }
             }
