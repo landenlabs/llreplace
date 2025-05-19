@@ -105,8 +105,6 @@ bool quiet = false;
 // static std::binary_semaphore lockOutput{0}; // Single thread can output to console.
 static std::counting_semaphore lockOutput{1};
 
-uint optionErrCnt = 0;
-uint patternErrCnt = 0;
 #ifdef HAVE_WIN
 lstring printPosFmt = "%r\\%f(%o) %l\n";
 #else
@@ -222,8 +220,8 @@ lstring parts(const char* filepath, bool dir, bool name, bool ext) {
 void printParts(
     const char* customFmt,
     const char* filepath,
-    unsigned long fileOffset,
-    unsigned long matchLen,
+    size_t fileOffset,
+    size_t matchLen,
     const char* matchPtr,
     const char* begLinePtr) {
 
@@ -310,7 +308,7 @@ void printParts(
                     int prefixLen = (int)(matchPtr - begLinePtr);
                     if (prefixLen > 0)
                         printf("%.*s", prefixLen, begLinePtr);
-                    std::cerr << Colors::colorize("_Y_");
+                    std::cerr << Colors::colorize("_G_");
                     printf("%.*s", (int)matchLen, matchPtr);
                     std::cerr << Colors::colorize("_X_");
                     int postLen = int(lineLen - matchLen - prefixLen);
@@ -684,7 +682,10 @@ static size_t ReplaceFile(const lstring& inFullname) {
                 matchCnt = FindFileGrep(inFullname);
             }
             if (isVerbose) {
-                std::cerr << "Match Found=" << matchCnt  << " in " << inFullname << std::endl;
+                if (matchCnt > 0)
+                    std::cerr << "Match found=" << matchCnt  << " in " << inFullname << std::endl;
+                else
+                    std::cerr << "No match in " << inFullname << std::endl;
             }
             if (matchCnt != 0) {
                 fileCount++;
@@ -881,31 +882,36 @@ void showHelp(const char* argv0) {
         "_p_Examples\n"
         " Search only, show patterns and defaults showing file and match:\n"
 #ifdef HAVE_WIN
-        "  llreplace -_y_from='Copyright' -_y_include=*.java -_y_print='%r/%f\\n' src1 src2\n"
-        "  llreplace -_y_from='Copyright' -_y_include=*.java -_y_include=*.xml -_y_print='%s' -_y_inverse src res\n"
+        "  llreplace -_y_from=\"Copyright\" -_y_include=*.java -_y_print='%r/%f\\n' src1 src2\n"
+        "  llreplace -_y_from=\"Copyright\" -_y_include=*.java -_y_include=*.xml -_y_print='%s' -_y_inverse src res\n"
+        "  llreplace -_y_from=\"d:[\\\\\\\\]\" ; Escape backslash and place in closure group\n"
+        "  llreplace -_y_from=\"if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]\"  -_y_include=*.java -_y_range=0,10 -_y_range=20,-1 -_y_printFmt=\"%f %03d: \" src1 src2\n"
 #else
         "  llreplace -_y_from='Copyright' '-_y_include=*.java' -_y_print='%r/%f\\n' src1 src2\n"
         "  llreplace -_y_from='Copyright' '-_y_include=*.java' -_y_include='*.xml' -_y_print='%s' -_y_inverse src res\n"
+        "  llreplace -_y_from='if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]'  '-_y_include=*.java' -_y_range=0,10 -_y_range=20,-1 -_y_printFmt='%f %03d: ' src1 src2\n"
 #endif
-        "  llreplace '-_y_from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]'  '-_y_include=*.java' -_y_range=0,10 -_y_range=20,-1 -_y_printFmt='%f %03d: ' src1 src2\n"
         "  llreplace -_y_printFmt=\"%m\\n\" -_y_from=\"<section id='trail-stats'>((?!</section).|\\r|\\n)*</section>\" \n"
         "\n"
         "  _y_output option can be used with search to save matches. Default is to console\n"
         "  llreplace -_y_out=matches.txt  -from=Copyright dir1 dir2 file1 file2 \n"
         "\n"
         " _P_Search and replace in-place:_X_\n"
+
+#ifdef HAVE_WIN
+        "  llreplace -_y_from=\"if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]\" -_y_to=\"MapConfigInfo.$1$2$3\" -_y_include=*.java src\n"
+        "  llreplace -_y_from=\"<block>\" -_y_till='</block>' '-_y_to=' '-_y_include=*.xml' res\n"
+        "  llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc=*\\\\.git  . \n"
+        "  llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc=*\\\\.(git||vs) . \n"
+        "  llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_Exc=.*\\\\[.](git||vs) . \n"
+#else
         "  llreplace '-_y_from=if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]' '-_y_to=MapConfigInfo.$1$2$3' '-_y_include=*.java' src\n"
         "  llreplace '-_y_from=<block>' -_y_till='</block>' '-_y_to=' '-_y_include=*.xml' res\n"
-#ifdef HAVE_WIN
-        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc=*\\\\.git  . \n"
-        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc=*\\\\.(git||vs) . \n"
-        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_Exc=.*\\\\[.](git||vs) . \n"
-#else
-        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc='*/.git'  . \n"
-        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc='*/.(git||vs)' . \n"
-        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_Exc='.*/[.](git||vs)' . \n"
+        "  llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc='*/.git'  . \n"
+        "  llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_Exc='*/.(git||vs)' . \n"
+        "  llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_Exc='.*/[.](git||vs)' . \n"
 #endif
-        "   llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_exc=\"[.](git||vs)\" . \n"
+        "  llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_exc=\"[.](git||vs)\" . \n"
         "\n";
 
     std::cerr << Colors::colorize(stringer("\n_W_", argv0, "_X_").c_str()) << Colors::colorize(helpMsg);
@@ -938,13 +944,13 @@ int main(int argc, char* argv[]) {
                         if (parser.validOption("backupDir", cmdName, false))
                             backupDir = value;
                         else if (parser.validOption("begin", cmdName, false)) {
-                            beginPat = parser.getRegEx(value);
+                            beginPat = parser.getRegEx(value, isVerbose);
                             // doLineByLine = value.find("\n") == std::string::npos;
                         }
                         break;
                     case 'f':   // from=<pat>
                         if (parser.validOption("from", cmdName)) {
-                            fromPat = parser.getRegEx(value);
+                            fromPat = parser.getRegEx(value, isVerbose);
                             findMode = FROM;
                             // doLineByLine = value.find("\n") == std::string::npos;
                         }
@@ -952,7 +958,7 @@ int main(int argc, char* argv[]) {
 
                     case 'i': // -ignore=<pattern>
                         if (parser.validOption("ignore", cmdName, false)) {
-                            ignorePat = parser.getRegEx(value);
+                            ignorePat = parser.getRegEx(value, isVerbose);
                             // doLineByLine = value.find("\n") == std::string::npos;
                         } else {  // includeItem=<pat>
                             parser.validPattern(includeFilePatList, value, "includeItem", cmdName);
@@ -961,7 +967,7 @@ int main(int argc, char* argv[]) {
                     case 'e':   // excludeItem=<pat>
                         if (parser.validPattern(excludeFilePatList, value, "excludeItem", cmdName, false)) {
                         } else  if (parser.validOption("end", cmdName)) {
-                            endPat = parser.getRegEx(value);
+                            endPat = parser.getRegEx(value, isVerbose);
                             // doLineByLine = value.find("\n") == std::string::npos;
                         }
                         break;
@@ -1013,7 +1019,7 @@ int main(int argc, char* argv[]) {
                     case 't':   // to=<pat>
                         if (parser.validOption("till", cmdName, false))  {
                             ParseUtil::convertSpecialChar(value);
-                            tillPat = parser.getRegEx(value);
+                            tillPat = parser.getRegEx(value, isVerbose);
                             findMode = FROM_TILL;
                             doLineByLine = true;
                         } else if (parser.validOption("to", cmdName, false))  {
@@ -1031,7 +1037,7 @@ int main(int argc, char* argv[]) {
                     case 'u':   // until=<pat>
                         if (parser.validOption("until", cmdName)) {
                             ParseUtil::convertSpecialChar(value);
-                            untilPat = parser.getRegEx(value);
+                            untilPat = parser.getRegEx(value, isVerbose);
                             findMode = FROM_UNTIL;
                             doLineByLine = true;
                         }
@@ -1104,7 +1110,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        if (patternErrCnt == 0 && optionErrCnt == 0 && fileDirList.size() != 0) {
+        if (parser.patternErrCnt == 0 && parser.optionErrCnt == 0 && fileDirList.size() != 0) {
             SwapStream swapStream(cout);
             if (quiet) {
                 ofstream null("null");

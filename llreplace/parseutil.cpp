@@ -48,10 +48,12 @@ void ParseUtil::showUnknown(const char* argStr) {
 
 // ---------------------------------------------------------------------------
 // Return compiled regular expression from text.
-std::regex ParseUtil::getRegEx(const char* value) {
+std::regex ParseUtil::getRegEx(const char* value, bool isVerbose) {
     try {
         lstring valueStr(value);
         convertSpecialChar(valueStr);
+        if (isVerbose)
+            std::cerr << "RegEx=" << valueStr << std::endl;
         return ignoreCase ? std::regex(valueStr, regex_constants::icase) : std::regex(valueStr);
     } catch (const std::regex_error& regEx) {
         Colors::showError("Invalid regular expression ", regEx.what(), ", Pattern=", value);
@@ -83,7 +85,7 @@ bool ParseUtil::validOption(const char* validCmd, const char* possibleCmd, bool 
 }
 
 //-------------------------------------------------------------------------------------------------
-bool ParseUtil::validPattern(PatternList& outList, lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr) {
+bool ParseUtil::validPattern(PatternList& outList, lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr, bool isVerbose) {
     bool isOk = validOption(validCmd, possibleCmd, reportErr);
     if (isOk) {
         if (!unixRegEx) {
@@ -95,7 +97,7 @@ bool ParseUtil::validPattern(PatternList& outList, lstring& value, const char* v
             ReplaceAll(value, "*", ".*");
             ReplaceAll(value, "?", ".");
         }
-        outList.push_back(getRegEx(value));
+        outList.push_back(getRegEx(value, isVerbose));
     }
     return isOk;
 }
@@ -191,6 +193,7 @@ lstring& ParseUtil::convertSpecialChar(lstring& inOut) {
                 } else {
                     *outPtr++ = *inPtr;
                 }
+                break;
             case '\?':
             case '\'':
             case '\"':

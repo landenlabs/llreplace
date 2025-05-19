@@ -52,10 +52,10 @@ public:
 
     void showUnknown(const char* argStr);
 
-    std::regex getRegEx(const char* value);
+    std::regex getRegEx(const char* value, bool isVerbose);
 
     bool validOption(const char* validCmd, const char* possibleCmd, bool reportErr = true);
-    bool validPattern(PatternList& outList, lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr = true);
+    bool validPattern(PatternList& outList, lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr = true, bool isVerbose = false);
  
     bool validFile(fstream& stream, int mode, const lstring& value, const char* validCmd, const char* possibleCmd, bool reportErr = true);
 
