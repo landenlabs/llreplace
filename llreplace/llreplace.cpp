@@ -33,7 +33,7 @@
 // 4291 - No matching operator delete found
 #pragma warning( disable : 4291 )
 
-#define VERSION "v2.10"
+#define VERSION "v2.11"
 
 // Project files
 #include "ll_stdhdr.hpp"
@@ -884,7 +884,7 @@ void showHelp(const char* argv0) {
 #ifdef HAVE_WIN
         "  llreplace -_y_from=\"Copyright\" -_y_include=*.java -_y_print='%r/%f\\n' src1 src2\n"
         "  llreplace -_y_from=\"Copyright\" -_y_include=*.java -_y_include=*.xml -_y_print='%s' -_y_inverse src res\n"
-        "  llreplace -_y_from=\"d:[\\\\\\\\]\" ; Escape backslash and place in closure group\n"
+        "  llreplace -_y_from=\"d:[\\\\\\\\]\"  -to=\"c:\\\\\\\\\" ; Escape backslash and place in closure group\n"
         "  llreplace -_y_from=\"if [(]MapConfigInfo.DEBUG[)] [{][\\r\\n ]*Log[.](d|e)([(][^)]*[)];)[\\r\\n ]*[}]\"  -_y_include=*.java -_y_range=0,10 -_y_range=20,-1 -_y_printFmt=\"%f %03d: \" src1 src2\n"
 #else
         "  llreplace -_y_from='Copyright' '-_y_include=*.java' -_y_print='%r/%f\\n' src1 src2\n"
