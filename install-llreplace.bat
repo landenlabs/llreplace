@@ -18,6 +18,7 @@ cd %prog%-ms
 
 @echo Clean %proj% 
 rmdir /s x64 2> nul
+rmdir /s %prog%\x64
 
 @echo.
 @echo Build release target
@@ -42,6 +43,6 @@ ld -a -ph %prog%-ms\x64\Release\%prog%.exe %dstdir%\%prog%.exe
 
 @rem play happy tone
 rundll32.exe cmdext.dll,MessageBeepStub
-rundll32 user32.dll,MessageBeep
+@rem rundll32 user32.dll,MessageBeep
 
 :_end
