@@ -29,9 +29,9 @@
 /* Begin PBXFileReference section */
 		9A06FEC32D1F525300C62CF9 /* threader.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = threader.hpp; sourceTree = "<group>"; };
 		9A06FEC42D1F525300C62CF9 /* threader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = threader.cpp; sourceTree = "<group>"; };
-		9A5C03D62D25AA1200460BCD /* llreplace */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; name = llreplace; path = "/Users/dennislang/opt/projects/projects-xcode/_ll/llreplace/build/Debug/llreplace"; sourceTree = "<absolute>"; };
 		9AB237242CF8E430007446E8 /* parseutil.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = parseutil.hpp; sourceTree = "<group>"; };
 		9AB237252CF8E430007446E8 /* parseutil.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = parseutil.cpp; sourceTree = "<group>"; };
+		9AC7421F2EE9F8AE00291334 /* llreplace */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = llreplace; sourceTree = BUILT_PRODUCTS_DIR; };
 		9AFA96122D11BEEF002F76BA /* signals.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = signals.hpp; sourceTree = "<group>"; };
 		9AFA96132D11BEEF002F76BA /* signals.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = signals.cpp; sourceTree = "<group>"; };
 		B9B44DCA1D8F661700782398 /* directory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = directory.cpp; sourceTree = "<group>"; };
@@ -57,6 +57,7 @@
 			isa = PBXGroup;
 			children = (
 				B9B44DBF1D8F65CD00782398 /* llreplace */,
+				9AC7421F2EE9F8AE00291334 /* llreplace */,
 			);
 			sourceTree = "<group>";
 		};
@@ -96,7 +97,7 @@
 			);
 			name = llreplace;
 			productName = llreplace;
-			productReference = 9A5C03D62D25AA1200460BCD /* llreplace */;
+			productReference = 9AC7421F2EE9F8AE00291334 /* llreplace */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -260,7 +261,7 @@
 		B9B44DC51D8F65CD00782398 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
@@ -275,7 +276,7 @@
 		B9B44DC61D8F65CD00782398 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;

@@ -33,7 +33,7 @@
 // 4291 - No matching operator delete found
 #pragma warning( disable : 4291 )
 
-#define VERSION "v2.11"
+#define VERSION "v2.12"
 
 // Project files
 #include "ll_stdhdr.hpp"
@@ -474,7 +474,56 @@ unsigned FindFileGrep(const char* filepath) {
 }
 
 // ---------------------------------------------------------------------------
-// Find 'fromPat' in file
+// Find and optionally replace 'fromPat' from stream line-by-line
+unsigned FindLineGrep(const char* filepath, istream& in, ostream& out, const char* outPrefix) { // "TO="
+    uint matchCnt = 0;
+    std::smatch match;
+    size_t off = 0;
+
+    Buffer buffer(512);
+    pFilter->init(buffer.data());
+    std::string lineBuffer;
+
+    fileProgress(filepath);   // g_fileCnt++;
+    while (getline(in, lineBuffer)) {
+        
+        if (std::regex_search(lineBuffer.cbegin(), lineBuffer.cend(), match, fromPat, rxFlags))   {
+            g_regSearchCnt++;
+            // for (auto group : match)
+            //    std::cout << group << endl;
+
+            size_t pos = match.position();
+            size_t len = match.length();
+            // size_t numMatches = match.size();
+            // std::string matchedStr = match.str();
+            // std::string m0 = match[0];
+
+            off += pos;
+
+            if (pFilter->valid(off, len)) {
+                if (! inverseMatch) {
+                    if (matchCnt == 0)
+                        lockOutput.acquire();
+                    
+                    printParts(printPosFmt, filepath, off, len, lineBuffer.c_str()+pos, lineBuffer.c_str());
+                    if (doReplace) {
+                        string result;
+                        std::regex_replace(std::back_inserter(result), lineBuffer.begin(), lineBuffer.end(), fromPat, toPat, rxFlags);
+                        out << outPrefix << result << std::endl;
+                    } else {
+                        std::cerr << lineBuffer << std::endl;
+                    }
+                }
+                matchCnt++;
+            }
+        }
+    }
+    
+    return matchCnt;
+}
+
+// ---------------------------------------------------------------------------
+// Find 'fromPat' in file and optionally replace line-by-line
 unsigned FindLineGrep(const char* filepath) {
     lstring         filename;
     ifstream        in;
@@ -489,45 +538,8 @@ unsigned FindLineGrep(const char* filepath) {
 
         in.open(filepath);
         if (in.good() && filestat.st_size > 0 && S_ISREG(filestat.st_mode)) {
-            // std::match_results <std::string> match;
-            std::smatch match;
-            size_t off = 0;
-
-            Buffer buffer(512);
-            pFilter->init(buffer.data());
-            std::string lineBuffer;
-
-            fileProgress(filepath);   // g_fileCnt++;
-            while (getline(in, lineBuffer)) {
-                if (std::regex_search(lineBuffer.cbegin(), lineBuffer.cend(), match, fromPat, rxFlags))   {
-                    g_regSearchCnt++;
-                    // for (auto group : match)
-                    //    std::cout << group << endl;
-
-                    size_t pos = match.position();
-                    size_t len = match.length();
-                    // size_t numMatches = match.size();
-                    // std::string matchedStr = match.str();
-                    // std::string m0 = match[0];
-
-                    off += pos;
-
-                    if (pFilter->valid(off, len)) {
-                        if (! inverseMatch) {
-                            if (matchCnt == 0)
-                                lockOutput.acquire();
-                            
-                            printParts(printPosFmt, filepath, off, len, lineBuffer.c_str()+pos, lineBuffer.c_str());
-                            if (doReplace) {
-                                string result;
-                                std::regex_replace(std::back_inserter(result), lineBuffer.begin(), lineBuffer.end(), fromPat, toPat, rxFlags);
-                                std::cout << "TO=" << result << std::endl;
-                            }
-                        }
-                        matchCnt++;
-                    }
-                }
-            }
+            
+            matchCnt = FindLineGrep(filepath, in, out, "TO=");
             
             if (inverseMatch && matchCnt == 0) {
                 char dummy[] = "\n";
@@ -912,6 +924,10 @@ void showHelp(const char* argv0) {
         "  llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_Exc='.*/[.](git||vs)' . \n"
 #endif
         "  llreplace -_y_from=\"http:\" -_y_to=\"https:\" -_y_regex -_y_exc=\"[.](git||vs)\" . \n"
+        "\n"
+        "  If input is dash, read from stdin, if @ read list of filepaths from stdin\n"
+        "    type foo.txt | llreplace -_y_from=\"http:\" -_y_to=\"https:\" -- - >out.txt \n"
+        "    find . -name \*.txt | llreplace -_y_from=\"http:\" -_y_to=\"https:\" @ >out.txt \n"
         "\n";
 
     std::cerr << Colors::colorize(stringer("\n_W_", argv0, "_X_").c_str()) << Colors::colorize(helpMsg);
@@ -1140,11 +1156,15 @@ int main(int argc, char* argv[]) {
             }
 
             size_t fileMatchCnt = 0;
-            if (fileDirList.size() == 1 && fileDirList[0] == "-") {
+            if (fileDirList.size() == 1 && fileDirList[0] == "@") {
                 string filePath;
-                while (std::getline(std::cin, filePath)) {
+                while (std::getline(std::cin, filePath)) {  // Read list of files
                     fileMatchCnt += ReplaceFiles(filePath);
                 }
+            } else if (fileDirList.size() == 1 && fileDirList[0] == "-") {
+                // std::ifstream in = ifstream("data.txt");
+                std::cerr << "Reading from stdin\n";
+                fileMatchCnt = FindLineGrep("stdin", std::cin, std::cout, "");
             } else {
                 for (auto const& filePath : fileDirList) {
                     fileMatchCnt += ReplaceFiles(filePath);
