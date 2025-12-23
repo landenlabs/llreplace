@@ -927,7 +927,11 @@ void showHelp(const char* argv0) {
         "\n"
         "  If input is dash, read from stdin, if @ read list of filepaths from stdin\n"
         "    type foo.txt | llreplace -_y_from=\"http:\" -_y_to=\"https:\" -- - >out.txt \n"
+#ifdef HAVE_WIN
+        "    find . -name *.txt | llreplace -_y_from=\"http:\" -_y_to=\"https:\" @ >out.txt \n"
+#else
         "    find . -name \*.txt | llreplace -_y_from=\"http:\" -_y_to=\"https:\" @ >out.txt \n"
+#endif
         "\n";
 
     std::cerr << Colors::colorize(stringer("\n_W_", argv0, "_X_").c_str()) << Colors::colorize(helpMsg);
