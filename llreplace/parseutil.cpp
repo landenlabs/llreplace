@@ -48,10 +48,13 @@ void ParseUtil::showUnknown(const char* argStr) {
 
 // ---------------------------------------------------------------------------
 // Return compiled regular expression from text.
+// Note: input is passed through unchanged — regex owns its own escape semantics
+// (\\ -> one literal backslash, \n -> newline, etc.). Running a pre-pass that
+// collapses \\ -> \ would force the user to over-escape, and on Windows it
+// compounds with MSVCRT's argv backslash-halving rule.
 std::regex ParseUtil::getRegEx(const char* value, bool isVerbose) {
     try {
         lstring valueStr(value);
-        convertSpecialChar(valueStr);
         if (isVerbose)
             std::cerr << "RegEx=" << valueStr << std::endl;
         return ignoreCase ? std::regex(valueStr, regex_constants::icase) : std::regex(valueStr);

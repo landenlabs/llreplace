@@ -1,12 +1,12 @@
 //-------------------------------------------------------------------------------------------------
 //
-//  llreplace      Dec-2024       Dennis Lang
+//  llreplace      May-2026       Dennis Lang
 //
 //  Regular expression file text replacement tool
 //
 //-------------------------------------------------------------------------------------------------
 //
-// Author: Dennis Lang - 2024
+// Author: Dennis Lang - 2026
 // https://landenlabs.com/
 //
 // ----- License ----
@@ -33,11 +33,7 @@
 // 4291 - No matching operator delete found
 #pragma warning( disable : 4291 )
 
-<<<<<<< Updated upstream
-#define VERSION "v6.05.05"
-=======
 #define VERSION "v6.05.10"
->>>>>>> Stashed changes
 
 // Project files
 #include "ll_stdhdr.hpp"
@@ -358,6 +354,120 @@ void fileProgress(const char* filePath) {
 }
 
 // ---------------------------------------------------------------------------
+// Text encoding detected from leading BOM bytes.
+enum FileEncoding {
+    ENC_UTF8,         // ASCII / UTF-8 without BOM (original path)
+    ENC_UTF8_BOM,     // EF BB BF
+    ENC_UTF16_LE,     // FF FE
+    ENC_UTF16_BE      // FE FF
+};
+
+// Return encoding from leading BOM. bomLen receives bytes to skip past.
+static FileEncoding detectEncoding(const char* data, size_t size, size_t& bomLen) {
+    bomLen = 0;
+    const unsigned char* p = (const unsigned char*)data;
+    if (size >= 3 && p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF) {
+        bomLen = 3;
+        return ENC_UTF8_BOM;
+    }
+    if (size >= 2 && p[0] == 0xFF && p[1] == 0xFE) {
+        bomLen = 2;
+        return ENC_UTF16_LE;
+    }
+    if (size >= 2 && p[0] == 0xFE && p[1] == 0xFF) {
+        bomLen = 2;
+        return ENC_UTF16_BE;
+    }
+    return ENC_UTF8;
+}
+
+static inline void appendUtf8(std::string& out, uint32_t cp) {
+    if (cp < 0x80) {
+        out.push_back((char)cp);
+    } else if (cp < 0x800) {
+        out.push_back((char)(0xC0 | (cp >> 6)));
+        out.push_back((char)(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+        out.push_back((char)(0xE0 | (cp >> 12)));
+        out.push_back((char)(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back((char)(0x80 | (cp & 0x3F)));
+    } else {
+        out.push_back((char)(0xF0 | (cp >> 18)));
+        out.push_back((char)(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back((char)(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back((char)(0x80 | (cp & 0x3F)));
+    }
+}
+
+// Transcode UTF-16 byte stream to UTF-8 (appended to out).
+static void utf16ToUtf8(const char* src, size_t srcByteLen, bool isLE, std::string& out) {
+    out.reserve(out.size() + srcByteLen);
+    size_t end = srcByteLen & ~(size_t)1;
+    size_t i = 0;
+    while (i + 1 < end) {
+        uint32_t cp = isLE
+            ? (uint32_t)((unsigned char)src[i] | ((unsigned char)src[i+1] << 8))
+            : (uint32_t)(((unsigned char)src[i] << 8) | (unsigned char)src[i+1]);
+        i += 2;
+        if (cp >= 0xD800 && cp <= 0xDBFF && i + 1 < end) {
+            uint32_t low = isLE
+                ? (uint32_t)((unsigned char)src[i] | ((unsigned char)src[i+1] << 8))
+                : (uint32_t)(((unsigned char)src[i] << 8) | (unsigned char)src[i+1]);
+            if (low >= 0xDC00 && low <= 0xDFFF) {
+                cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
+                i += 2;
+            }
+        }
+        appendUtf8(out, cp);
+    }
+}
+
+// Transcode UTF-8 to UTF-16 byte stream (appended as raw bytes to out).
+static void utf8ToUtf16(const char* src, size_t srcLen, bool isLE, std::string& out) {
+    out.reserve(out.size() + srcLen * 2);
+    auto write16 = [&](uint16_t v) {
+        if (isLE) {
+            out.push_back((char)(v & 0xFF));
+            out.push_back((char)((v >> 8) & 0xFF));
+        } else {
+            out.push_back((char)((v >> 8) & 0xFF));
+            out.push_back((char)(v & 0xFF));
+        }
+    };
+    size_t i = 0;
+    while (i < srcLen) {
+        uint32_t cp;
+        unsigned char b0 = (unsigned char)src[i];
+        if (b0 < 0x80) {
+            cp = b0; i++;
+        } else if ((b0 & 0xE0) == 0xC0 && i + 1 < srcLen) {
+            cp = ((b0 & 0x1F) << 6) | ((unsigned char)src[i+1] & 0x3F);
+            i += 2;
+        } else if ((b0 & 0xF0) == 0xE0 && i + 2 < srcLen) {
+            cp = ((b0 & 0x0F) << 12)
+               | (((unsigned char)src[i+1] & 0x3F) << 6)
+               | ((unsigned char)src[i+2] & 0x3F);
+            i += 3;
+        } else if ((b0 & 0xF8) == 0xF0 && i + 3 < srcLen) {
+            cp = ((b0 & 0x07) << 18)
+               | (((unsigned char)src[i+1] & 0x3F) << 12)
+               | (((unsigned char)src[i+2] & 0x3F) << 6)
+               | ((unsigned char)src[i+3] & 0x3F);
+            i += 4;
+        } else {
+            cp = 0xFFFD; i++;
+        }
+        if (cp < 0x10000) {
+            write16((uint16_t)cp);
+        } else {
+            cp -= 0x10000;
+            write16((uint16_t)(0xD800 | (cp >> 10)));
+            write16((uint16_t)(0xDC00 | (cp & 0x3FF)));
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 bool isBinary(Buffer& buffer, struct stat& filestat, const char* fullname) {
     if (binaryOkay)
         return false;
@@ -421,15 +531,36 @@ unsigned FindFileGrep(const char* filepath) {
                 buffer[0] = EOL_CHR;
                 streamsize inCnt = in.read(buffer.data() + 1, buffer.size()-1).gcount();
                 in.close();
-                
-                if (isBinary(buffer, filestat, filepath))
-                    return 0;
-                    
+
+                size_t bomLen = 0;
+                FileEncoding enc = detectEncoding(buffer.data() + 1, (size_t)inCnt, bomLen);
+
+                std::string utf8Holder;     // populated only when transcoding UTF-16
+                const char* begPtr;
+                const char* endPtr;
+                const char* lineRefPtr;     // base for pFilter line counting
+
+                if (enc == ENC_UTF16_LE || enc == ENC_UTF16_BE) {
+                    g_utf16Cnt++;
+                    utf8Holder.push_back(EOL_CHR);  // preserve leading-EOL sentinel for strchrRev
+                    utf16ToUtf8(buffer.data() + 1 + bomLen,
+                                (size_t)inCnt - bomLen,
+                                enc == ENC_UTF16_LE,
+                                utf8Holder);
+                    begPtr = utf8Holder.data() + 1;
+                    endPtr = utf8Holder.data() + utf8Holder.size();
+                    lineRefPtr = utf8Holder.data();
+                } else {
+                    if (isBinary(buffer, filestat, filepath))
+                        return 0;
+                    begPtr = buffer.data() + 1 + bomLen;
+                    endPtr = buffer.data() + 1 + (size_t)inCnt;
+                    lineRefPtr = buffer.data();
+                }
+
                 std::match_results <const char*> match;
-                const char* begPtr = (const char*)buffer.data() + 1;
-                const char* endPtr = begPtr + inCnt;
                 size_t off = 0;
-                pFilter->init(buffer.data());
+                pFilter->init(lineRefPtr);
 
                 fileProgress(filepath);   // g_fileCnt++;
                 while (begPtr < endPtr && std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)) {
@@ -590,14 +721,30 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
             streamsize inCnt = in.read(buffer.data(), buffer.size()).gcount();
             in.close();
 
-            if (isBinary(buffer, filestat, inFilepath))
-                return 0;
-            
+            size_t bomLen = 0;
+            FileEncoding enc = detectEncoding(buffer.data(), (size_t)inCnt, bomLen);
+            bool isUtf16 = (enc == ENC_UTF16_LE || enc == ENC_UTF16_BE);
+
+            std::string utf8Holder;     // populated only when transcoding UTF-16
+            const char* begPtr;
+            const char* endPtr;
+
+            if (isUtf16) {
+                g_utf16Cnt++;
+                utf16ToUtf8(buffer.data() + bomLen, (size_t)inCnt - bomLen,
+                            enc == ENC_UTF16_LE, utf8Holder);
+                begPtr = utf8Holder.data();
+                endPtr = utf8Holder.data() + utf8Holder.size();
+            } else {
+                if (isBinary(buffer, filestat, inFilepath))
+                    return 0;
+                begPtr = buffer.data() + bomLen;
+                endPtr = buffer.data() + (size_t)inCnt;
+            }
+
             std::match_results <const char*> match;
             std::match_results <const char*> matchEnd;
-            const char* begPtr = (const char*)buffer.data();
-            const char* endPtr = begPtr + inCnt;
-            pFilter->init(buffer.data());
+            pFilter->init(begPtr);
 
             // WARNING - LineFilter only validates first match and not multiple replacements.
             if (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags)
@@ -612,7 +759,10 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
                 if (outFilepath != "-") {
                     if (canForce)
                         DirUtil::makeWriteableFile(outFilepath, nullptr);
-                    out.open(outFilepath);
+                    // UTF-16 round-trip needs binary mode so the OS does not translate \n -> \r\n
+                    std::ios_base::openmode omode = std::ios::out
+                        | (isUtf16 ? std::ios::binary : std::ios_base::openmode(0));
+                    out.open(outFilepath, omode);
                     if (out.is_open()) {
                         outPtr = &out;
                     } else {
@@ -621,41 +771,90 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
                     }
                 }
 
-                // TODO - support tillPat and untilPat
+                // Preserve a UTF-8 BOM if the input had one.
+                if (enc == ENC_UTF8_BOM) {
+                    outPtr->put((char)0xEF);
+                    outPtr->put((char)0xBB);
+                    outPtr->put((char)0xBF);
+                }
+
+                // For UTF-16 round-trip, capture replacement bytes into replacedUtf8,
+                // then transcode + write with BOM. Otherwise stream directly to outPtr.
+                std::string replacedUtf8;
+                std::back_insert_iterator<std::string> outBack(replacedUtf8);
+                std::ostreambuf_iterator<char> outStream(*outPtr);
+
                 // Compute region of match and replace it.
                 size_t offset;
                 switch (findMode) {
                 case FROM:
                     // TODO - support LineFilter validation.
-                    std::regex_replace(std::ostreambuf_iterator<char>(*outPtr),
-                        begPtr,
-                        endPtr,
-                        fromPat, toPat, rxFlags);
+                    if (isUtf16) {
+                        std::regex_replace(outBack, begPtr, endPtr, fromPat, toPat, rxFlags);
+                    } else {
+                        std::regex_replace(outStream, begPtr, endPtr, fromPat, toPat, rxFlags);
+                    }
                     break;
                 case FROM_TILL:
                     do {
-                        outPtr->write(begPtr, match.position());
+                        if (isUtf16) {
+                            replacedUtf8.append(begPtr, match.position());
+                        } else {
+                            outPtr->write(begPtr, match.position());
+                        }
                         offset = match.position() +  match.length();
                         if (std::regex_search(begPtr + offset, endPtr, matchEnd, tillPat, rxFlags)) {
-                            (*outPtr) << toPat;
+                            if (isUtf16) {
+                                replacedUtf8.append(toPat);
+                            } else {
+                                (*outPtr) << toPat;
+                            }
                             offset += matchEnd.position() + matchEnd.length();
                         }
                         begPtr += offset;
                     } while (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags));
-                    outPtr->write(begPtr, endPtr - begPtr);
+                    if (isUtf16) {
+                        replacedUtf8.append(begPtr, endPtr - begPtr);
+                    } else {
+                        outPtr->write(begPtr, endPtr - begPtr);
+                    }
                     break;
                 case FROM_UNTIL:
                     do {
-                        outPtr->write(begPtr, match.position());
+                        if (isUtf16) {
+                            replacedUtf8.append(begPtr, match.position());
+                        } else {
+                            outPtr->write(begPtr, match.position());
+                        }
                         offset = match.position() +  match.length();
                         if (std::regex_search(begPtr + offset, endPtr, matchEnd, tillPat, rxFlags)) {
-                            (*outPtr) << toPat;
+                            if (isUtf16) {
+                                replacedUtf8.append(toPat);
+                            } else {
+                                (*outPtr) << toPat;
+                            }
                             offset += matchEnd.position();
                         }
                         begPtr += offset;
                     } while (std::regex_search(begPtr, endPtr, match, fromPat, rxFlags));
-                    outPtr->write(begPtr, endPtr - begPtr);
+                    if (isUtf16) {
+                        replacedUtf8.append(begPtr, endPtr - begPtr);
+                    } else {
+                        outPtr->write(begPtr, endPtr - begPtr);
+                    }
                     break;
+                }
+
+                if (isUtf16) {
+                    bool isLE = (enc == ENC_UTF16_LE);
+                    if (isLE) {
+                        outPtr->put((char)0xFF); outPtr->put((char)0xFE);
+                    } else {
+                        outPtr->put((char)0xFE); outPtr->put((char)0xFF);
+                    }
+                    std::string utf16Bytes;
+                    utf8ToUtf16(replacedUtf8.data(), replacedUtf8.size(), isLE, utf16Bytes);
+                    outPtr->write(utf16Bytes.data(), utf16Bytes.size());
                 }
 
                 if (out.is_open()) {
@@ -818,6 +1017,15 @@ template<typename TT, typename ... Args >
 std::string stringer(const TT& value, const Args& ... args) {
     return string(value) + stringer(args...);
 }
+const char* removeQuotes(const char* value) {
+#ifdef HAVE_WIN
+	if (value[0] == '\'' && value[strlen(value) - 1] == '\'') {
+		((char*)value)[strlen(value) - 1] = '\0';
+		return value + 1;
+	}
+#endif
+    return value;
+}
 
 // ---------------------------------------------------------------------------
 void showHelp(const char* argv0) {
@@ -974,7 +1182,7 @@ int main(int argc, char* argv[]) {
                         break;
                     case 'f':   // from=<pat>
                         if (parser.validOption("from", cmdName)) {
-                            fromPat = parser.getRegEx(value, isVerbose);
+                            fromPat = parser.getRegEx(removeQuotes(value), isVerbose);
                             findMode = FROM;
                             // doLineByLine = value.find("\n") == std::string::npos;
                         }
@@ -1042,7 +1250,6 @@ int main(int argc, char* argv[]) {
 
                     case 't':   // to=<pat>
                         if (parser.validOption("till", cmdName, false))  {
-                            ParseUtil::convertSpecialChar(value);
                             tillPat = parser.getRegEx(value, isVerbose);
                             findMode = FROM_TILL;
                             doLineByLine = true;
@@ -1060,7 +1267,6 @@ int main(int argc, char* argv[]) {
 
                     case 'u':   // until=<pat>
                         if (parser.validOption("until", cmdName)) {
-                            ParseUtil::convertSpecialChar(value);
                             untilPat = parser.getRegEx(value, isVerbose);
                             findMode = FROM_UNTIL;
                             doLineByLine = true;
@@ -1195,10 +1401,10 @@ int main(int argc, char* argv[]) {
             } else {
                 std::cerr << "Elapsed " << milli.count() << " milliSeconds" << endl;
             }
-            std::cerr << "Files Checked= " << g_fileCnt << endl;
-            std::cerr << "Binary Skipped=" << g_binaryCnt << endl;
-            if (g_utf16Cnt != 0) 
-                std::cerr << "UTF16 Skipped=" << g_binaryCnt << endl;
+            std::cerr << "Files Checked=  " << g_fileCnt << endl;
+            std::cerr << "Binary Skipped= " << g_binaryCnt << endl;
+            if (g_utf16Cnt != 0)
+                std::cerr << "UTF16 Processed=" << g_utf16Cnt << endl;
             std::cerr << "Files Matched= " << fileMatchCnt << endl;
             if (toPat.empty() || doLineByLine) {
                 std::cerr << (doLineByLine ? "Lines " : "Patterns ") << "Matched= " << g_regSearchCnt << endl;
