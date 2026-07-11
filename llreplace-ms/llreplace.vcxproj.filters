@@ -15,16 +15,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\llreplace\directory.cpp">
+    <ClCompile Include="..\llcommon\directory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\llreplace\llreplace.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\llreplace\parseutil.cpp">
+    <ClCompile Include="..\llcommon\parseutil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\llreplace\signals.cpp">
+    <ClCompile Include="..\llcommon\signals.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\llreplace\threader.cpp">
@@ -32,22 +32,22 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\llreplace\directory.hpp">
+    <ClInclude Include="..\llcommon\directory.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\llreplace\filters.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\llreplace\ll_stdhdr.hpp">
+    <ClInclude Include="..\llcommon\ll_stdhdr.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\llreplace\lstring.hpp">
+    <ClInclude Include="..\llcommon\lstring.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\llreplace\parseutil.hpp">
+    <ClInclude Include="..\llcommon\parseutil.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\llreplace\signals.hpp">
+    <ClInclude Include="..\llcommon\signals.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\llreplace\threader.hpp">

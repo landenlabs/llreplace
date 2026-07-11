@@ -1,23 +1,23 @@
 CXX = clang++
-CXXFLAGS = -std=c++11
+CXXFLAGS = -std=c++20 -I../llcommon -pthread
 
-# define the C source files
-SRCS = llreplace.cpp directory.cpp
+# define the C++ source files
+SRCS = llreplace.cpp threader.cpp ../llcommon/directory.cpp ../llcommon/parseutil.cpp ../llcommon/signals.cpp
 
-OBJS = $(SRCS:.c=.o)
+OBJS = $(SRCS:.cpp=.o)
 
-# define the executable file 
+# define the executable file
 MAIN = llreplace
 
 all: $(MAIN)
-      
-      
-$(MAIN): $(OBJS) 
+
+
+$(MAIN): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(MAIN) $(OBJS) # $(LFLAGS) $(LIBS)
-  
+
 
 clean:
-	rm -rf *.o* $(MAIN)
+	rm -rf *.o* ../llcommon/*.o $(MAIN)
 
 
 #depend: $(SRCS)
