@@ -43,6 +43,12 @@ public:
     bool valid(size_t pos, size_t len) {
         return true;
     }
+
+    // Called once per real input line, regardless of whether it matched - lets a
+    // line-oriented filter (LineFilter) track the true line number. No-op by default.
+    virtual
+    void nextLine() {
+    }
 };
 
 // ---------------------------------------------------------------------------
@@ -78,14 +84,16 @@ public:
 
     void countTo(size_t pos) {
         const char* cPtr = pBuffer + lastPos;
-        pos -= lastPos;
-        const char* endPtr = cPtr + pos;
+        size_t delta = pos - lastPos;   // chars to scan this call, kept separate from pos itself
+        const char* endPtr = cPtr + delta;
         while (cPtr < endPtr) {
             if (*cPtr++ == eol) {
                 lineCnt++;
             }
         }
-        lastPos = pos;
+        lastPos = pos;   // store the ABSOLUTE position - previously this stored the delta
+                         // computed above (pos was reassigned in place), so every call after
+                         // the first re-scanned from the wrong (too-early) starting point.
     }
 
     bool inZones(size_t lineNum) const {
@@ -114,9 +122,16 @@ public:
         lineCnt = 0;
     }
 
+    // lineCnt is advanced by nextLine(), called once per real input line regardless of
+    // whether it matched - previously incremented here instead, so lineCnt counted
+    // matching lines, not real file line numbers, making -range wrong in line-by-line mode.
+    virtual
+    void nextLine() {
+        lineCnt++;
+    }
+
     virtual
     bool valid(size_t pos, size_t lenIgnored) {
-        lineCnt++;
         return inZones(lineCnt);
     }
 

@@ -52,7 +52,7 @@ class ThreadJob  {
 public:
     Tid id;
     Job* jobPtr;
-    volatile bool isDone;
+    std::atomic<bool> isDone;  // written by the worker thread, read by the main thread
     std::thread thread1;
 
     ThreadJob(Tid _id, Job* _jobPtr): id(_id), jobPtr(_jobPtr), isDone(false),
@@ -101,8 +101,12 @@ void Threader::runIt(Job* jobPtr) {
 }
 
 void Threader::waitForAll(Job* jobPtr) {
-    // while (threadJobCnt > 0) {
-    for (int idx = 0; idx < 10 && threadJobCnt > 0; idx++) {
+    // Wait for every in-flight thread to finish - the caller relies on this to know all
+    // file writes have completed before the program exits. This used to give up after
+    // ~100s (10 iterations x up to 10s each) even if threads were still running, silently
+    // returning to the caller (and letting the process exit) while a worker could still
+    // be mid-write.
+    while (threadJobCnt > 0) {
         clearDoneJobs(jobPtr);
         if (threadJobCnt != 0)
             (void)threadLimiter.try_acquire_for(std::chrono::seconds(10));    // threadLimiter.acquire();
@@ -119,13 +123,13 @@ void Threader::waitForAll(Job* jobPtr) {
     }
 }
 
-void clearDoneJobs(Job* jobPtr) {
+void clearDoneJobs(Job* /* jobPtr - currently unused; kept for a uniform call signature */) {
     ThreadJobs::iterator jobIter = threadJobs.begin();
     while (jobIter != threadJobs.end()) {
-        ThreadJob* jobPtr = *jobIter;
-        if (jobPtr->isDone) {
-            jobPtr->join();
-            delete jobPtr;
+        ThreadJob* curJobPtr = *jobIter;
+        if (curJobPtr->isDone) {
+            curJobPtr->join();
+            delete curJobPtr;
             jobIter = threadJobs.erase(jobIter);
         } else {
             ++jobIter;
@@ -143,7 +147,12 @@ typedef std::vector<Block> Blocks;
 static Blocks blocks(MAX_THREADS);
 static std::vector<bool> blocksUsed(MAX_THREADS, false);
 static std::shared_mutex lockGetBlock;
-static std::binary_semaphore lockFreeBlock{0};
+// Bounded by MAX_THREADS: at most MAX_THREADS buffers can ever be pending release at
+// once, so release() can never be called more times than that without a matching
+// acquire(). A binary_semaphore (max value 1) has undefined behavior if release() is
+// called while already at its max - which could happen here whenever more than one
+// buffer was released without an intervening acquire.
+static std::counting_semaphore<MAX_THREADS> lockFreeBlock{0};
 
 static size_t bufferTotalSize = 0;
 const uint NO_IDX = -1;
@@ -151,8 +160,15 @@ static uint maxBufIdx = NO_IDX;
 const size_t MAX_TOTAL_SIZE = 1024 * 1024 * 200 * MAX_THREADS;
 
 
+// Must be called with lockGetBlock already held. Returns NO_IDX (rather than blocking)
+// if every block is currently in use - the caller (findBuffer) waits for one to free up
+// and retries, WITHOUT holding lockGetBlock while it waits. Blocking here while holding
+// the lock would deadlock against releaseBuffer, which also needs lockGetBlock to safely
+// update the same state this function reads/writes (blocksUsed/blocks/bufferTotalSize/
+// maxBufIdx were previously mutated by releaseBuffer with no locking at all - a data race
+// with this function, which mutates the same state under the lock).
 static uint getBuffer(size_t capacity) {
-    
+
     uint bestIdx = NO_IDX;
     
     // Requested capacity best fit inside block
@@ -191,27 +207,37 @@ static uint getBuffer(size_t capacity) {
             maxBufIdx = bestIdx;
         }
     } else {
-        lockFreeBlock.acquire();
-        return getBuffer(capacity);
+        return NO_IDX;
     }
-    
+
     blocksUsed[bestIdx] = true;
     return bestIdx;
 }
 
 static uint findBuffer(size_t capacity) {
-    std::scoped_lock lock(lockGetBlock);
-    uint bestIdx = getBuffer(capacity);
-    return bestIdx;
+    for (;;) {
+        {
+            std::scoped_lock lock(lockGetBlock);
+            uint bestIdx = getBuffer(capacity);
+            if (bestIdx != NO_IDX) {
+                return bestIdx;
+            }
+        }
+        // No free block right now - wait for a release OUTSIDE the lock, then retry.
+        lockFreeBlock.acquire();
+    }
 }
 
 static void releaseBuffer(unsigned int bufIdx) {
-    if (bufIdx == maxBufIdx && bufferTotalSize > MAX_TOTAL_SIZE) {
-        bufferTotalSize -= blocks[bufIdx].capacity();
-        blocks[bufIdx].clear();
-        maxBufIdx = NO_IDX;
+    {
+        std::scoped_lock lock(lockGetBlock);
+        if (bufIdx == maxBufIdx && bufferTotalSize > MAX_TOTAL_SIZE) {
+            bufferTotalSize -= blocks[bufIdx].capacity();
+            blocks[bufIdx].clear();
+            maxBufIdx = NO_IDX;
+        }
+        blocksUsed[bufIdx] = false;
     }
-    blocksUsed[bufIdx] = false;
     lockFreeBlock.release();
 }
 

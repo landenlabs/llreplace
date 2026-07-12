@@ -52,6 +52,7 @@
 #include <regex>
 #include <exception>
 #include <chrono>   // Timing program execution
+#include <algorithm>   // std::replace
 
 #ifdef HAVE_WIN
 #define getcwd _getcwd
@@ -105,6 +106,21 @@ bool quiet = false;
 // static std::binary_semaphore lockOutput{0}; // Single thread can output to console.
 static std::counting_semaphore lockOutput{1};
 
+// RAII guard for lockOutput: acquire() at most once (on first lock() call), and
+// release() exactly once iff lock() was ever called, when the guard goes out of
+// scope - including via an exception. Callers used to pair a manual acquire()
+// (only when !inverseMatch) with an unconditional release() gated on matchCnt!=0;
+// with inverseMatch that released a semaphore that was never acquired (inflating
+// its count and breaking mutual exclusion for other threads), and an exception
+// thrown between acquire() and the matchCnt++ that followed it (swallowed by an
+// inner catch) meant release() never ran at all (permanent deadlock for anyone
+// else waiting on console output).
+struct OutputLockGuard {
+    bool held = false;
+    void lock() { if (!held) { lockOutput.acquire(); held = true; } }
+    ~OutputLockGuard() { if (held) lockOutput.release(); }
+};
+
 #ifdef HAVE_WIN
 lstring printPosFmt = "%r\\%f(%o) %l\n";
 #else
@@ -133,19 +149,13 @@ size_t maxLineSize = MAX_LINE_LEN_DEF;
 
 #endif
 
-#if 1
-std::regex_constants::match_flag_type rxFlags =
-    std::regex_constants::match_flag_type(
-        std::regex_constants::match_default
-        + std::regex_constants::extended
-    );
-#else
-std::regex_constants::match_flag_type rxFlags =
-    std::regex_constants::match_flag_type(
-        std::regex_constants::match_default
-        + std::regex_constants::match_not_eol
-        + std::regex_constants::match_not_bol);
-#endif
+// regex_constants::extended is a syntax_option_type (only meaningful when
+// constructing a std::regex), not a match_flag_type. On libc++ its value (32)
+// numerically collides with match_not_null (also 32), so combining it into
+// rxFlags silently suppressed every match capable of matching an empty string
+// (e.g. quantifiers with * or ?) - regex_replace("abc", regex("x*"), "Y") with
+// the old flags returned "abc" unchanged instead of the correct "YaYbYcY".
+std::regex_constants::match_flag_type rxFlags = std::regex_constants::match_default;
 
 
 Filter nopFilter;
@@ -511,6 +521,7 @@ unsigned FindFileGrep(const char* filepath) {
     ofstream        out;
     struct stat     filestat;
     uint            matchCnt = 0;
+    OutputLockGuard outputLock;
 
 
     try {
@@ -573,24 +584,28 @@ unsigned FindFileGrep(const char* filepath) {
                     // std::string m0 = match[0];
                     
                     off += pos;
-                    
+
                     if (pFilter->valid(off, len)) {
                         if (! inverseMatch) {
-                            if (matchCnt == 0)
-                                lockOutput.acquire();
+                            outputLock.lock();
                             // printParts(printPosFmt, filepath, off, len, lstring(begPtr + pos, len), strchrRev(begPtr + pos, EOL_CHR) +1);
                             printParts(printPosFmt, filepath, off, len, begPtr + pos, strchrRev(begPtr + pos, EOL_CHR, min(pos, maxLineSize)) +1);
                         }
                         matchCnt++;
                     }
-                    
+
+                    // off tracked only the match's position relative to the current begPtr;
+                    // begPtr itself advances by pos+len each iteration, so off must too, or
+                    // every match after the first understates its true absolute offset by
+                    // the sum of all prior matches' lengths.
+                    off += len;
                     begPtr += pos + len;
                 }
             } catch (exception ex) {
                 int err = errno;
                 Colors::showError("File read exception on ", filepath, " ", strerror(err));
             }
-           
+
             if (inverseMatch && matchCnt == 0) {
                 char dummy[] = "\n";
                 printParts(printPosFmt, filepath, 0, filestat.st_size, dummy, dummy);
@@ -601,10 +616,9 @@ unsigned FindFileGrep(const char* filepath) {
     } catch (exception ex) {
         Colors::showError(ex.what(), " Parsing error in file:",  filepath);
     }
-    
-    if (matchCnt != 0)
-        lockOutput.release();
-    
+
+    // outputLock's destructor releases lockOutput here, exactly once, iff it was
+    // ever acquired above - regardless of inverseMatch or an exception in between.
     return inverseMatch ? (matchCnt > 0 ? 0 : 1) : matchCnt;
 }
 
@@ -614,6 +628,7 @@ unsigned FindLineGrep(const char* filepath, istream& in, ostream& out, const cha
     uint matchCnt = 0;
     std::smatch match;
     size_t off = 0;
+    OutputLockGuard outputLock;
 
     Buffer buffer(512);
     pFilter->init(buffer.data());
@@ -621,7 +636,8 @@ unsigned FindLineGrep(const char* filepath, istream& in, ostream& out, const cha
 
     fileProgress(filepath);   // g_fileCnt++;
     while (getline(in, lineBuffer)) {
-        
+        pFilter->nextLine();   // advance the real line number regardless of match, for LineFilter's -range
+
         if (std::regex_search(lineBuffer.cbegin(), lineBuffer.cend(), match, fromPat, rxFlags))   {
             g_regSearchCnt++;
             // for (auto group : match)
@@ -637,9 +653,8 @@ unsigned FindLineGrep(const char* filepath, istream& in, ostream& out, const cha
 
             if (pFilter->valid(off, len)) {
                 if (! inverseMatch) {
-                    if (matchCnt == 0)
-                        lockOutput.acquire();
-                    
+                    outputLock.lock();
+
                     printParts(printPosFmt, filepath, off, len, lineBuffer.c_str()+pos, lineBuffer.c_str());
                     if (doReplace) {
                         string result;
@@ -688,9 +703,8 @@ unsigned FindLineGrep(const char* filepath) {
         Colors::showError(ex.what(), " Parsing error in file:",  filepath);
     }
 
-    if (matchCnt != 0)
-        lockOutput.release();
-    
+    // The 4-arg FindLineGrep above now owns its own OutputLockGuard and releases
+    // lockOutput itself before returning - no matching release needed here.
     return inverseMatch ? (matchCnt > 0 ? 0 : 1) : matchCnt;
 }
 
@@ -698,11 +712,14 @@ unsigned FindLineGrep(const char* filepath) {
 // Find fromPat and Replace with toPat in filepath.
 //  inFilepath = full file name path
 //  outfilePath = full file name paht, can be same as inFilepath
-//  backupToName = name only part
+//  backupToName = full path of inFilepath (NOT just the basename - two files with the
+//                 same basename from different subdirectories need distinct backup
+//                 names, or the second one silently overwrites the first's backup)
 bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const lstring& backupToName) {
     ifstream        in;
     ofstream        out;
     struct stat     filestat;
+    lstring         tempFilepath;   // set only once we start writing to a real (non-stdout) output file
 
     try {
         if (stat(inFilepath, &filestat) != 0)
@@ -752,21 +769,35 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
                 g_regSearchCnt++;
                 if (! backupDir.empty()) {
                     lstring backupFull;
-                    rename(inFilepath, DirUtil::join(backupFull, backupDir, backupToName));
+                    // Flatten the full path into a single unique filename (no subdirectories
+                    // to create under backupDir) - using just the basename let two files with
+                    // the same name from different subdirectories overwrite each other's backup.
+                    lstring flatName = backupToName;
+                    std::replace(flatName.begin(), flatName.end(), '/', '_');
+                    std::replace(flatName.begin(), flatName.end(), '\\', '_');
+                    rename(inFilepath, DirUtil::join(backupFull, backupDir, flatName));
                 }
 
                 ostream* outPtr = &cout;
                 if (outFilepath != "-") {
                     if (canForce)
                         DirUtil::makeWriteableFile(outFilepath, nullptr);
+                    // Write to a temp file in the same directory, then atomically rename it
+                    // over outFilepath only once every byte has been written successfully.
+                    // Previously outFilepath itself was opened (and truncated) directly, so a
+                    // crash, kill, or exception mid-write left it corrupted with no way back -
+                    // the only recovery was an explicit -backupDir, and even that only helped
+                    // if the backup rename above had already completed.
+                    tempFilepath = outFilepath + ".llreplace.tmp";
                     // UTF-16 round-trip needs binary mode so the OS does not translate \n -> \r\n
                     std::ios_base::openmode omode = std::ios::out
                         | (isUtf16 ? std::ios::binary : std::ios_base::openmode(0));
-                    out.open(outFilepath, omode);
+                    out.open(tempFilepath, omode);
                     if (out.is_open()) {
                         outPtr = &out;
                     } else {
-                        Colors::showError(strerror(errno), ", Unable to write to ", outFilepath);
+                        Colors::showError(strerror(errno), ", Unable to write to ", tempFilepath);
+                        tempFilepath.clear();
                         return false;
                     }
                 }
@@ -860,6 +891,13 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
                 if (out.is_open()) {
                     out.close();
                 }
+                if (! tempFilepath.empty()) {
+                    if (rename(tempFilepath, outFilepath) != 0) {
+                        Colors::showError(strerror(errno), ", Unable to replace ", outFilepath, " with ", tempFilepath);
+                        remove(tempFilepath);
+                        return false;
+                    }
+                }
                 return true;
             }
         } else if (!in.good()) {
@@ -867,6 +905,12 @@ bool ReplaceFile(const lstring& inFilepath, const lstring& outFilepath, const ls
         }
     } catch (exception ex) {
         Colors::showError(ex.what(), ", Error in file:", inFilepath);
+    }
+    if (out.is_open()) {
+        out.close();
+    }
+    if (! tempFilepath.empty()) {
+        remove(tempFilepath);  // leave outFilepath untouched - only the temp copy is discarded
     }
     return false;
 }
@@ -885,7 +929,7 @@ static size_t ReplaceFile(const lstring& inFullname) {
         ) {
         if (doReplace && !dryRun) {
             string outFullname = (outFile.length() != 0) ? outFile : inFullname;
-            if (ReplaceFile(inFullname, outFullname, name)) {
+            if (ReplaceFile(inFullname, outFullname, inFullname)) {
                 fileCount++;
                 // printParts(printPosFmt, fullname, 0, 0, "");
             }
@@ -1069,8 +1113,8 @@ void showHelp(const char* argv0) {
         "   -_y_quiet                         ; Do not show matches \n"
         "   -_y_line                          ; Force line-by-line compare, def: entire file \n"
 #ifdef CAN_THREAD
-        "   -_y_threads                       ; Search/Replace using 20 threads \n"
-        "   -_y_threads=<#threads>            ; Search/Replace using threads \n"
+        "   -_y_threads                       ; Search/Replace using multiple threads \n"
+        "   -_y_threads=<#threads>            ; Search/Replace using threads, capped at 10 \n"
 #endif
         "\n"
         "_P_PrintFmt:_X_ \n"
@@ -1343,7 +1387,13 @@ int main(int argc, char* argv[]) {
         if (parser.patternErrCnt == 0 && parser.optionErrCnt == 0 && fileDirList.size() != 0) {
             SwapStream swapStream(cout);
             if (quiet) {
-                ofstream null("null");
+                // Open the actual OS null device, not a file literally named "null" in the
+                // current directory (which is what this created and then left behind).
+#ifdef HAVE_WIN
+                ofstream null("NUL");
+#else
+                ofstream null("/dev/null");
+#endif
                 swapStream.swap(null);
                 fclose(stdout);
             } else if (outFile.length() > 0 && !doReplace) {
@@ -1359,7 +1409,13 @@ int main(int argc, char* argv[]) {
             ReplaceFilesInit();
             
             char cwdTmp[256];
-            cwd = getcwd(cwdTmp, sizeof(cwdTmp));
+            if (getcwd(cwdTmp, sizeof(cwdTmp)) == nullptr) {
+                // getcwd() fails if cwd's path is >= sizeof(cwdTmp) (or on other errno
+                // conditions) - assigning the resulting NULL char* into an lstring would be UB.
+                Colors::showError(strerror(errno), ", Unable to get current directory");
+                cwdTmp[0] = '\0';
+            }
+            cwd = cwdTmp;
             cwd += Directory_files::SLASH;
 
             if (! toPat.empty() && pFilter != &nopFilter) {
