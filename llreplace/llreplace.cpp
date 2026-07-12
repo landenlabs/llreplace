@@ -1175,7 +1175,56 @@ void showHelp(const char* argv0) {
 #endif
         "\n";
 
+    // Patterns are compiled with C++ std::regex using its default grammar,
+    // which is ECMAScript (JavaScript-style), the same on Mac, Linux and Windows.
+    const char* regexHelpMsg =
+        "_P_Regular expression language (ECMAScript / JavaScript-style):_X_\n"
+        "\n"
+        "  _P_Anchors:_X_\n"
+        "   ^                  ; Start of line (or string) \n"
+        "   $                  ; End of line (or string) \n"
+        "   \\b  \\B              ; Word boundary / not a word boundary \n"
+        "\n"
+        "  _P_Any char and repetition:_X_\n"
+        "   .                  ; Any char except \\r \\n \n"
+        "   *                  ; 0 or more, greedy \n"
+        "   +                  ; 1 or more, greedy \n"
+        "   ?                  ; 0 or 1, greedy \n"
+        "   *?  +?  ??         ; Lazy (non-greedy) versions of above \n"
+        "   {n}                ; Exactly n times \n"
+        "   {n,}               ; n or more times \n"
+        "   {n,m}              ; Between n and m times \n"
+        "\n"
+        "  _P_Character classes:_X_\n"
+        "   [abc]              ; Any one of a, b, c \n"
+        "   [^abc]             ; Any char except a, b, c \n"
+        "   [a-z0-9]           ; Range \n"
+        "   \\d  \\D              ; Digit / non-digit \n"
+        "   \\w  \\W              ; Word char [A-Za-z0-9_] / non-word char \n"
+        "   \\s  \\S              ; Whitespace / non-whitespace \n"
+        "\n"
+        "  _P_Groups and alternation:_X_\n"
+        "   (...)              ; Capture group, $1 $2 ... in replacement \n"
+        "   (?:...)            ; Non-capturing group \n"
+        "   (?=...)            ; Positive lookahead \n"
+        "   (?!...)            ; Negative lookahead \n"
+        "   a|b                ; Alternation, match a or b \n"
+        "\n"
+        "  _P_Escaping:_X_\n"
+        "   \\.  \\*  \\+  \\?  \\(  \\)  \\[  \\]  \\{  \\}  \\|  \\\\ \n"
+        "                      ; Backslash-escape to match the literal character \n"
+        "   [.] [*] [(] etc.   ; Alternative way to match a literal special char \n"
+        "\n"
+        "  _P_Replacement:_X_\n"
+        "   $1 $2 ...          ; Backreference to capture group N in -_y_to pattern \n"
+        "   $&                 ; Entire match \n"
+        "\n"
+        "  Note: since this is the same std::regex ECMAScript grammar on Mac, Linux\n"
+        "  and Windows, patterns are portable across platforms.\n"
+        "\n";
+
     std::cerr << Colors::colorize(stringer("\n_W_", argv0, "_X_").c_str()) << Colors::colorize(helpMsg);
+    std::cerr << Colors::colorize(regexHelpMsg);
 }
 
 // ---------------------------------------------------------------------------
@@ -1350,6 +1399,7 @@ int main(int argc, char* argv[]) {
                         case '-':
                             break;
                         case '?':
+                        case 'h':
                             showHelp(argv[0]);
                             return 0;
                         default:
