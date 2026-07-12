@@ -106,15 +106,6 @@ bool quiet = false;
 // static std::binary_semaphore lockOutput{0}; // Single thread can output to console.
 static std::counting_semaphore lockOutput{1};
 
-// RAII guard for lockOutput: acquire() at most once (on first lock() call), and
-// release() exactly once iff lock() was ever called, when the guard goes out of
-// scope - including via an exception. Callers used to pair a manual acquire()
-// (only when !inverseMatch) with an unconditional release() gated on matchCnt!=0;
-// with inverseMatch that released a semaphore that was never acquired (inflating
-// its count and breaking mutual exclusion for other threads), and an exception
-// thrown between acquire() and the matchCnt++ that followed it (swallowed by an
-// inner catch) meant release() never ran at all (permanent deadlock for anyone
-// else waiting on console output).
 struct OutputLockGuard {
     bool held = false;
     void lock() { if (!held) { lockOutput.acquire(); held = true; } }
@@ -149,12 +140,6 @@ size_t maxLineSize = MAX_LINE_LEN_DEF;
 
 #endif
 
-// regex_constants::extended is a syntax_option_type (only meaningful when
-// constructing a std::regex), not a match_flag_type. On libc++ its value (32)
-// numerically collides with match_not_null (also 32), so combining it into
-// rxFlags silently suppressed every match capable of matching an empty string
-// (e.g. quantifiers with * or ?) - regex_replace("abc", regex("x*"), "Y") with
-// the old flags returned "abc" unchanged instead of the correct "YaYbYcY".
 std::regex_constants::match_flag_type rxFlags = std::regex_constants::match_default;
 
 

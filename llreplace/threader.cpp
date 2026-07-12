@@ -147,11 +147,6 @@ typedef std::vector<Block> Blocks;
 static Blocks blocks(MAX_THREADS);
 static std::vector<bool> blocksUsed(MAX_THREADS, false);
 static std::shared_mutex lockGetBlock;
-// Bounded by MAX_THREADS: at most MAX_THREADS buffers can ever be pending release at
-// once, so release() can never be called more times than that without a matching
-// acquire(). A binary_semaphore (max value 1) has undefined behavior if release() is
-// called while already at its max - which could happen here whenever more than one
-// buffer was released without an intervening acquire.
 static std::counting_semaphore<MAX_THREADS> lockFreeBlock{0};
 
 static size_t bufferTotalSize = 0;
