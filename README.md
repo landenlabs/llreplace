@@ -21,6 +21,12 @@ LLReplace searches file text data using regular expression and replaces matches 
 
   [![Build status](https://travis-ci.org/landenlabs/llreplace.svg?branch=master)](https://travis-ci.org/landenlabs/llreplace)
   [![Known Vulnerabilities](https://snyk.io/test/github/landenlabs/llreplace/badge.svg)](https://snyk.io/test/github/landenlabs/llreplace)
+  [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE.txt)
+  ![Language](https://img.shields.io/badge/language-C%2B%2B17-blue.svg)
+  ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg)
+
+### Dependencies
+* [llcommon](https://github.com/landenlabs/llcommon) - shared LanDen Labs utility library (git submodule)
 
   
 **Help screen**
@@ -116,6 +122,23 @@ Examples
 
 </pre>
 
+### License
+
+```
+Copyright 2026 Dennis Lang
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+See [LICENSE.txt](LICENSE.txt) for the full license text.
 
 Visit home website
 
